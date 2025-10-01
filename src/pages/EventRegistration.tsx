@@ -25,7 +25,6 @@ const EventRegistration: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showTeamRegistration, setShowTeamRegistration] = useState(false);
   const [participantId, setParticipantId] = useState<string>('');
 
   const {

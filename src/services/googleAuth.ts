@@ -8,8 +8,8 @@ import {
 } from 'firebase/auth';
 import { auth } from '../firebase';
 
-// Google OAuth configuration
-const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '848218204703-qb849bqu9nht5var8h8aqkhgmpee0k72.apps.googleusercontent.com';
+// Google OAuth configuration (using Firebase Auth, so client ID is handled by Firebase)
+// const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '848218204703-qb849bqu9nht5var8h8aqkhgmpee0k72.apps.googleusercontent.com';
 
 export interface GoogleUser {
   id: string;
