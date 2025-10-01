@@ -29,6 +29,8 @@ const AdminPage: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [newEvent, setNewEvent] = useState({
     title: '',
     description: '',
@@ -99,6 +101,61 @@ const AdminPage: React.FC = () => {
     } catch (error) {
       console.error('Error creating event:', error);
       toast.error('Failed to create event');
+    }
+  };
+
+  const handleEditEvent = (event: Event) => {
+    setEditingEvent(event);
+    setNewEvent({
+      title: event.title,
+      description: event.description,
+      date: event.date,
+      time: event.time,
+      location: event.location,
+      entryFee: event.entryFee,
+      maxParticipants: event.maxParticipants || 0,
+      paymentMethod: event.paymentMethod,
+      upiId: event.upiId || '',
+      isTeamEvent: event.isTeamEvent,
+      teamSize: event.teamSize || 1,
+    });
+    setShowEditForm(true);
+  };
+
+  const handleUpdateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!editingEvent) return;
+    
+    try {
+      await dataService.updateEvent(editingEvent.id, {
+        ...newEvent,
+        isActive: true,
+      });
+      
+      toast.success('Event updated successfully!');
+      setShowEditForm(false);
+      setEditingEvent(null);
+      setNewEvent({
+        title: '',
+        description: '',
+        date: '',
+        time: '',
+        location: '',
+        entryFee: 0,
+        maxParticipants: 0,
+        paymentMethod: 'both',
+        upiId: '',
+        isTeamEvent: false,
+        teamSize: 1,
+      });
+      
+      // Reload events
+      const eventsData = await dataService.getEvents();
+      setEvents(eventsData);
+    } catch (error) {
+      console.error('Error updating event:', error);
+      toast.error('Failed to update event');
     }
   };
 
@@ -451,6 +508,167 @@ const AdminPage: React.FC = () => {
           </motion.div>
         )}
 
+        {/* Edit Event Form */}
+        {showEditForm && (
+          <motion.div
+            className="bg-gray-800 rounded-xl p-6 mb-8"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <h3 className="text-xl font-semibold text-white mb-6">Edit Event</h3>
+            
+            <form onSubmit={handleUpdateEvent} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Event Title</label>
+                <input
+                  type="text"
+                  value={newEvent.title}
+                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                <textarea
+                  value={newEvent.description}
+                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  rows={3}
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Date</label>
+                <input
+                  type="date"
+                  value={newEvent.date}
+                  onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Time</label>
+                <input
+                  type="time"
+                  value={newEvent.time}
+                  onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Location</label>
+                <input
+                  type="text"
+                  value={newEvent.location}
+                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Entry Fee (₹)</label>
+                <input
+                  type="number"
+                  value={newEvent.entryFee}
+                  onChange={(e) => setNewEvent({ ...newEvent, entryFee: Number(e.target.value) })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  min="0"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Max Participants</label>
+                <input
+                  type="number"
+                  value={newEvent.maxParticipants}
+                  onChange={(e) => setNewEvent({ ...newEvent, maxParticipants: Number(e.target.value) })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  min="1"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Payment Method</label>
+                <select
+                  value={newEvent.paymentMethod}
+                  onChange={(e) => setNewEvent({ ...newEvent, paymentMethod: e.target.value as 'online' | 'offline' | 'both' })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                >
+                  <option value="online">Online Only</option>
+                  <option value="offline">Offline Only</option>
+                  <option value="both">Both</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">UPI ID</label>
+                <input
+                  type="text"
+                  value={newEvent.upiId}
+                  onChange={(e) => setNewEvent({ ...newEvent, upiId: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  placeholder="example@upi"
+                />
+              </div>
+              
+              <div className="md:col-span-2">
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={newEvent.isTeamEvent}
+                      onChange={(e) => setNewEvent({ ...newEvent, isTeamEvent: e.target.checked })}
+                      className="mr-2"
+                    />
+                    <span className="text-gray-300">Team Event</span>
+                  </label>
+                  
+                  {newEvent.isTeamEvent && (
+                    <div className="flex items-center">
+                      <label className="text-gray-300 mr-2">Team Size:</label>
+                      <input
+                        type="number"
+                        value={newEvent.teamSize}
+                        onChange={(e) => setNewEvent({ ...newEvent, teamSize: Number(e.target.value) })}
+                        className="w-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white"
+                        min="2"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="md:col-span-2 flex space-x-4">
+                <button
+                  type="submit"
+                  className="btn-primary flex-1"
+                >
+                  Update Event
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditForm(false);
+                    setEditingEvent(null);
+                  }}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+
         {/* Events List */}
         <div className="space-y-6">
           <h2 className="text-2xl font-semibold text-white">Events Management</h2>
@@ -534,6 +752,7 @@ const AdminPage: React.FC = () => {
                         <User className="h-4 w-4 text-green-400" />
                       </button>
                       <button
+                        onClick={() => handleEditEvent(event)}
                         className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
                         title="Edit Event"
                       >

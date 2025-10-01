@@ -151,21 +151,13 @@ const ParticipantDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex space-x-2">
-                    <Link
-                      to={`/qr/${participant.id}`}
-                      className="btn-secondary flex-1 flex items-center justify-center space-x-2"
-                    >
-                      <QrCode className="h-4 w-4" />
-                      <span>View QR Code</span>
-                    </Link>
-                    <Link
-                      to={`/participant-info/${participant.id}`}
-                      className="btn-primary flex-1 text-center"
-                    >
-                      View Details
-                    </Link>
-                  </div>
+                  <Link
+                    to={`/qr/${participant.id}`}
+                    className="btn-primary w-full text-center flex items-center justify-center space-x-2"
+                  >
+                    <QrCode className="h-4 w-4" />
+                    <span>View QR Code</span>
+                  </Link>
                 </motion.div>
               );
             })}

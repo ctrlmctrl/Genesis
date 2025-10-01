@@ -127,25 +127,6 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, loading }) => {
                 </div>
               </Link>
               
-              <div className="card-glow p-6">
-                <div className="text-center">
-                  <h3 className="text-xl font-semibold text-white mb-4">Staff Access</h3>
-                  <div className="space-y-3">
-                    <Link
-                      to="/volunteer"
-                      className="block w-full px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-colors text-sm"
-                    >
-                      Volunteer Dashboard
-                    </Link>
-                    <Link
-                      to="/admin"
-                      className="block w-full px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors text-sm"
-                    >
-                      Admin Dashboard
-                    </Link>
-                  </div>
-                </div>
-              </div>
             </motion.div>
 
         {/* Events Section */}

@@ -11,7 +11,6 @@ import VolunteerAnalytics from './pages/VolunteerAnalytics';
 import ParticipantDashboard from './pages/ParticipantDashboard';
 import AdminPage from './pages/AdminPage';
 import EventDetails from './pages/EventDetails';
-import ParticipantInfo from './pages/ParticipantInfo';
 import { dataService } from './services/dataService';
 
 function App() {
@@ -45,7 +44,6 @@ function App() {
             <Route path="/volunteer/analytics" element={<VolunteerAnalytics />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/events/:eventId" element={<EventDetails />} />
-            <Route path="/participant-info/:participantId" element={<ParticipantInfo />} />
           </Routes>
         </div>
       </Router>

@@ -72,7 +72,7 @@ const EventRegistration: React.FC = () => {
         setShowPaymentModal(true);
       } else {
         toast.success('Registration successful!');
-        navigate(`/participant-info/${participant.id}`);
+        navigate(`/qr/${participant.id}`);
       }
     } catch (error) {
       console.error('Registration error:', error);
@@ -93,7 +93,7 @@ const EventRegistration: React.FC = () => {
       );
       
       toast.success('Payment completed! Registration successful!');
-      navigate(`/participant-info/${participantId}`);
+      navigate(`/qr/${participantId}`);
     } catch (error) {
       console.error('Payment update error:', error);
       toast.error('Failed to update payment status');
@@ -142,7 +142,7 @@ const EventRegistration: React.FC = () => {
       <div className="mobile-container">
         <div className="flex items-center mb-6">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(-1)}
             className="mr-4 p-2 hover:bg-gray-800 rounded-lg transition-colors"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -167,7 +167,7 @@ const EventRegistration: React.FC = () => {
       {/* Header */}
       <div className="flex items-center mb-6">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate(-1)}
           className="mr-4 p-2 hover:bg-gray-800 rounded-lg transition-colors"
         >
           <ArrowLeft className="h-5 w-5" />

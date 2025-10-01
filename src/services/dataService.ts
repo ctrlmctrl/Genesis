@@ -91,11 +91,12 @@ class DataService {
       throw new Error('This is a team event. Please use team registration.');
     }
 
+    const participantId = this.generateId();
     const participant: Participant = {
       ...participantData,
-      id: this.generateId(),
+      id: participantId,
       registrationDate: new Date().toISOString(),
-      qrCode: this.generateQRCode(participantData.eventId, participantData.email),
+      qrCode: this.generateQRCode(participantData.eventId, participantData.email, participantId),
       isVerified: false,
       paymentStatus: 'pending',
     };
@@ -141,21 +142,22 @@ class DataService {
 
     for (let i = 0; i < teamMembers.length; i++) {
       const member = teamMembers[i];
-      const participant: Participant = {
-        id: `participant-${Date.now()}-${i}`,
-        eventId,
-        fullName: member.fullName,
-        email: member.email,
-        phone: member.phone,
-        college: member.college,
-        registrationDate: new Date().toISOString(),
-        qrCode: this.generateQRCode(eventId, member.email),
-        isVerified: false,
-        teamId,
-        teamName,
-        isTeamLead: i === 0, // First member is team lead
-        paymentStatus: 'pending',
-      };
+        const participantId = `participant-${Date.now()}-${i}`;
+        const participant: Participant = {
+          id: participantId,
+          eventId,
+          fullName: member.fullName,
+          email: member.email,
+          phone: member.phone,
+          college: member.college,
+          registrationDate: new Date().toISOString(),
+          qrCode: this.generateQRCode(eventId, member.email, participantId),
+          isVerified: false,
+          teamId,
+          teamName,
+          isTeamLead: i === 0, // First member is team lead
+          paymentStatus: 'pending',
+        };
 
       this.participants.push(participant);
       registeredMembers.push(participant);
@@ -238,9 +240,10 @@ class DataService {
     return Math.random().toString(36).substr(2, 9);
   }
 
-  private generateQRCode(eventId: string, email: string): string {
-    // In a real app, this would generate a proper QR code
-    return `EVENT:${eventId}:${email}:${Date.now()}`;
+  private generateQRCode(eventId: string, email: string, participantId?: string): string {
+    // Generate QR code with participant ID for scanning
+    const id = participantId || this.generateId();
+    return `EVENT:${eventId}:${id}:${email}:${Date.now()}`;
   }
 
   // Initialize with sample data

@@ -76,16 +76,17 @@ const VolunteerScanner: React.FC = () => {
 
   const handleQRCodeScanned = async (decodedText: string) => {
     try {
-      // Extract participant ID from QR code
-      const participantId = decodedText.split('/').pop();
-      if (!participantId) {
+      // Parse QR code data
+      const parts = decodedText.split(':');
+      if (parts.length < 4 || parts[0] !== 'EVENT') {
         toast.error('Invalid QR code format');
         return;
       }
 
+      const participantId = parts[2]; // Third part is participant ID
+      
       // Find participant by ID
-      const participants = await dataService.getParticipants();
-      const foundParticipant = participants.find((p: Participant) => p.id === participantId);
+      const foundParticipant = await dataService.getParticipant(participantId);
       
       if (!foundParticipant) {
         toast.error('Participant not found');
