@@ -82,13 +82,6 @@ const EventRegistration: React.FC = () => {
     }
   };
 
-  const handleTeamRegistrationSuccess = (participants: any[]) => {
-    toast.success('Team registration successful!');
-    // Navigate to first participant's info page
-    if (participants.length > 0) {
-      navigate(`/participant-info/${participants[0].id}`);
-    }
-  };
 
   const handlePaymentComplete = async (paymentId: string, method: 'online' | 'offline') => {
     try {
