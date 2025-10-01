@@ -8,7 +8,6 @@ import { dataService } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import GoogleLogin from '../components/GoogleLogin';
 import PaymentModal from '../components/PaymentModal';
-import TeamRegistrationForm from '../components/TeamRegistrationForm';
 
 interface RegistrationForm {
   fullName: string;
@@ -84,7 +83,6 @@ const EventRegistration: React.FC = () => {
   };
 
   const handleTeamRegistrationSuccess = (participants: any[]) => {
-    setShowTeamRegistration(false);
     toast.success('Team registration successful!');
     // Navigate to first participant's info page
     if (participants.length > 0) {
@@ -302,14 +300,9 @@ const EventRegistration: React.FC = () => {
             </button>
             
             {event.isTeamEvent && (
-              <button
-                type="button"
-                onClick={() => setShowTeamRegistration(true)}
-                className="btn-secondary flex-1 flex items-center justify-center"
-              >
-                <Users className="h-4 w-4 mr-2" />
-                Register Team
-              </button>
+              <div className="text-center text-gray-400 text-sm">
+                Team registration coming soon
+              </div>
             )}
           </div>
         </form>
@@ -327,14 +320,6 @@ const EventRegistration: React.FC = () => {
         />
       )}
 
-      {/* Team Registration Modal */}
-      {event && event.isTeamEvent && (
-        <TeamRegistrationForm
-          event={event}
-          onSuccess={handleTeamRegistrationSuccess}
-          onCancel={() => setShowTeamRegistration(false)}
-        />
-      )}
     </div>
   );
 };
