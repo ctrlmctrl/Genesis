@@ -1,10 +1,40 @@
 import { Event, Participant, ParticipantInfo, VerificationRecord } from '../types';
+import { localStorageService } from './localStorageService';
 
 // In a real application, this would be replaced with actual API calls
 class DataService {
   private events: Event[] = [];
   private participants: Participant[] = [];
   private verificationRecords: VerificationRecord[] = [];
+
+  constructor() {
+    this.loadDataFromStorage();
+    if (this.events.length === 0) {
+      this.initializeSampleData();
+    }
+  }
+
+  private async loadDataFromStorage(): Promise<void> {
+    try {
+      // For now, use localStorage directly since storageService integration needs more work
+      this.events = localStorageService.getEvents();
+      this.participants = localStorageService.getParticipants();
+      this.verificationRecords = localStorageService.getVerificationRecords();
+    } catch (error) {
+      console.error('Error loading data from storage:', error);
+    }
+  }
+
+  private async saveDataToStorage(): Promise<void> {
+    try {
+      // Use localStorage directly for now
+      localStorageService.saveEvents(this.events);
+      localStorageService.saveParticipants(this.participants);
+      localStorageService.saveVerificationRecords(this.verificationRecords);
+    } catch (error) {
+      console.error('Error saving data to storage:', error);
+    }
+  }
 
   // Event Management
   async createEvent(eventData: Omit<Event, 'id' | 'currentParticipants' | 'createdAt' | 'updatedAt'>): Promise<Event> {
@@ -17,6 +47,7 @@ class DataService {
     };
     
     this.events.push(event);
+    this.saveDataToStorage();
     return event;
   }
 
@@ -43,6 +74,23 @@ class DataService {
 
   // Participant Management
   async registerParticipant(participantData: Omit<Participant, 'id' | 'registrationDate' | 'qrCode' | 'isVerified' | 'paymentStatus'>): Promise<Participant> {
+    const event = this.events.find(e => e.id === participantData.eventId);
+    if (!event) {
+      throw new Error('Event not found');
+    }
+
+    if (!event.isActive) {
+      throw new Error('Event is not active');
+    }
+
+    if (event.maxParticipants && event.currentParticipants >= event.maxParticipants) {
+      throw new Error('Event is full');
+    }
+
+    if (event.isTeamEvent) {
+      throw new Error('This is a team event. Please use team registration.');
+    }
+
     const participant: Participant = {
       ...participantData,
       id: this.generateId(),
@@ -55,11 +103,10 @@ class DataService {
     this.participants.push(participant);
 
     // Update event participant count
-    const event = this.events.find(e => e.id === participantData.eventId);
-    if (event) {
-      event.currentParticipants += 1;
-    }
+    event.currentParticipants += 1;
+    event.updatedAt = new Date().toISOString();
 
+    this.saveDataToStorage();
     return participant;
   }
 
@@ -67,15 +114,71 @@ class DataService {
     return this.participants.find(p => p.id === participantId) || null;
   }
 
+  async getParticipants(): Promise<Participant[]> {
+    return this.participants;
+  }
+
   async getParticipantsByEvent(eventId: string): Promise<Participant[]> {
     return this.participants.filter(p => p.eventId === eventId);
+  }
+
+  async registerTeam(eventId: string, teamName: string, teamMembers: Omit<Participant, 'id' | 'eventId' | 'qrCode' | 'registrationDate' | 'isVerified' | 'paymentStatus'>[]): Promise<Participant[]> {
+    const event = this.events.find(e => e.id === eventId);
+    if (!event) {
+      throw new Error('Event not found');
+    }
+
+    if (!event.isTeamEvent) {
+      throw new Error('This is not a team event');
+    }
+
+    if (teamMembers.length !== (event.teamSize || 1)) {
+      throw new Error(`Team must have exactly ${event.teamSize} members`);
+    }
+
+    const teamId = `team-${Date.now()}`;
+    const registeredMembers: Participant[] = [];
+
+    for (let i = 0; i < teamMembers.length; i++) {
+      const member = teamMembers[i];
+      const participant: Participant = {
+        id: `participant-${Date.now()}-${i}`,
+        eventId,
+        fullName: member.fullName,
+        email: member.email,
+        phone: member.phone,
+        college: member.college,
+        registrationDate: new Date().toISOString(),
+        qrCode: this.generateQRCode(eventId, member.email),
+        isVerified: false,
+        teamId,
+        teamName,
+        isTeamLead: i === 0, // First member is team lead
+        paymentStatus: 'pending',
+      };
+
+      this.participants.push(participant);
+      registeredMembers.push(participant);
+    }
+
+    // Update event participant count
+    event.currentParticipants += teamMembers.length;
+    event.updatedAt = new Date().toISOString();
+
+    this.saveDataToStorage();
+    return registeredMembers;
+  }
+
+  async getParticipantsByTeam(teamId: string): Promise<Participant[]> {
+    return this.participants.filter(p => p.teamId === teamId);
   }
 
   async updateParticipantInfo(participantId: string, info: ParticipantInfo): Promise<Participant | null> {
     const participantIndex = this.participants.findIndex(p => p.id === participantId);
     if (participantIndex === -1) return null;
 
-    this.participants[participantIndex].additionalInfo = info;
+    // Note: additionalInfo is no longer part of Participant interface
+    // This method is kept for compatibility but doesn't update anything
     return this.participants[participantIndex];
   }
 
@@ -142,7 +245,7 @@ class DataService {
 
   // Initialize with sample data
   initializeSampleData() {
-    const sampleEvent: Event = {
+    const sampleEvent1: Event = {
       id: 'sample-event-1',
       title: 'Tech Conference 2024',
       description: 'Annual technology conference featuring the latest innovations in AI, blockchain, and cloud computing. Join industry leaders for networking and knowledge sharing.',
@@ -154,11 +257,31 @@ class DataService {
       entryFee: 500,
       paymentMethod: 'both',
       upiId: 'genesis@upi',
+      isTeamEvent: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    this.events.push(sampleEvent);
+    const sampleEvent2: Event = {
+      id: 'sample-event-2',
+      title: 'Hackathon 2024',
+      description: '48-hour coding competition for teams of 4. Build innovative solutions and win prizes!',
+      date: '2024-03-20',
+      time: '10:00',
+      location: 'Tech Hub, Bangalore',
+      currentParticipants: 0,
+      maxParticipants: 100,
+      isActive: true,
+      entryFee: 200,
+      paymentMethod: 'both',
+      upiId: 'hackathon@upi',
+      isTeamEvent: true,
+      teamSize: 4,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.events.push(sampleEvent1, sampleEvent2);
   }
 }
 

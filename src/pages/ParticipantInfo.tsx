@@ -126,7 +126,7 @@ const ParticipantInfo: React.FC = () => {
           </div>
 
           <div className="space-y-2 text-sm text-gray-600">
-            <p><strong>Name:</strong> {participant.firstName} {participant.lastName}</p>
+            <p><strong>Name:</strong> {participant.fullName}</p>
             <p><strong>Email:</strong> {participant.email}</p>
             <p><strong>Registration Date:</strong> {new Date(participant.registrationDate).toLocaleDateString()}</p>
           </div>

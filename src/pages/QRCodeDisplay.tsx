@@ -44,7 +44,7 @@ const QRCodeDisplay: React.FC = () => {
     if (!qrCodeDataURL) return;
 
     const link = document.createElement('a');
-    link.download = `qr-code-${participant?.firstName}-${participant?.lastName}.png`;
+    link.download = `qr-code-${participant?.fullName?.replace(/\s+/g, '-')}.png`;
     link.href = qrCodeDataURL;
     document.body.appendChild(link);
     link.click();
@@ -57,7 +57,7 @@ const QRCodeDisplay: React.FC = () => {
 
     const shareData = {
       title: 'Event QR Code',
-      text: `QR Code for ${participant.firstName} ${participant.lastName}`,
+      text: `QR Code for ${participant.fullName}`,
       url: window.location.href,
     };
 
@@ -147,7 +147,7 @@ const QRCodeDisplay: React.FC = () => {
         <div className="bg-gray-50 p-4 rounded-lg mb-6">
           <h3 className="font-semibold text-gray-900 mb-3">Participant Information</h3>
           <div className="space-y-2 text-sm text-gray-600">
-            <p><strong>Name:</strong> {participant.firstName} {participant.lastName}</p>
+            <p><strong>Name:</strong> {participant.fullName}</p>
             <p><strong>Email:</strong> {participant.email}</p>
             <p><strong>Phone:</strong> {participant.phone}</p>
             <p><strong>Registration Date:</strong> {new Date(participant.registrationDate).toLocaleDateString()}</p>

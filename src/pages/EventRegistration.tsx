@@ -8,12 +8,13 @@ import { dataService } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import GoogleLogin from '../components/GoogleLogin';
 import PaymentModal from '../components/PaymentModal';
+import TeamRegistrationForm from '../components/TeamRegistrationForm';
 
 interface RegistrationForm {
-  firstName: string;
-  lastName: string;
+  fullName: string;
   email: string;
   phone: string;
+  college: string;
 }
 
 const EventRegistration: React.FC = () => {
@@ -24,6 +25,7 @@ const EventRegistration: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showTeamRegistration, setShowTeamRegistration] = useState(false);
   const [participantId, setParticipantId] = useState<string>('');
 
   const {
@@ -76,9 +78,18 @@ const EventRegistration: React.FC = () => {
       }
     } catch (error) {
       console.error('Registration error:', error);
-      toast.error('Registration failed. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Registration failed. Please try again.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleTeamRegistrationSuccess = (participants: any[]) => {
+    setShowTeamRegistration(false);
+    toast.success('Team registration successful!');
+    // Navigate to first participant's info page
+    if (participants.length > 0) {
+      navigate(`/participant-info/${participants[0].id}`);
     }
   };
 
@@ -212,31 +223,16 @@ const EventRegistration: React.FC = () => {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
-              First Name *
+              Full Name *
             </label>
             <input
               type="text"
-              {...register('firstName', { required: 'First name is required' })}
+              {...register('fullName', { required: 'Full name is required' })}
               className="input-field"
-              placeholder="Enter your first name"
+              placeholder="Enter your full name"
             />
-            {errors.firstName && (
-              <p className="text-red-400 text-sm mt-1">{errors.firstName.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Last Name *
-            </label>
-            <input
-              type="text"
-              {...register('lastName', { required: 'Last name is required' })}
-              className="input-field"
-              placeholder="Enter your last name"
-            />
-            {errors.lastName && (
-              <p className="text-red-400 text-sm mt-1">{errors.lastName.message}</p>
+            {errors.fullName && (
+              <p className="text-red-400 text-sm mt-1">{errors.fullName.message}</p>
             )}
           </div>
 
@@ -282,13 +278,41 @@ const EventRegistration: React.FC = () => {
             )}
           </div>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="btn-primary w-full"
-          >
-            {submitting ? 'Registering...' : 'Register for Event'}
-          </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              College/Institution *
+            </label>
+            <input
+              type="text"
+              {...register('college', { required: 'College/Institution is required' })}
+              className="input-field"
+              placeholder="Enter your college or institution name"
+            />
+            {errors.college && (
+              <p className="text-red-400 text-sm mt-1">{errors.college.message}</p>
+            )}
+          </div>
+
+          <div className="flex space-x-4">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn-primary flex-1"
+            >
+              {submitting ? 'Registering...' : 'Register for Event'}
+            </button>
+            
+            {event.isTeamEvent && (
+              <button
+                type="button"
+                onClick={() => setShowTeamRegistration(true)}
+                className="btn-secondary flex-1 flex items-center justify-center"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Register Team
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -301,6 +325,15 @@ const EventRegistration: React.FC = () => {
           eventTitle={event.title}
           amount={event.entryFee}
           upiId={event.upiId || 'genesis@upi'}
+        />
+      )}
+
+      {/* Team Registration Modal */}
+      {event && event.isTeamEvent && (
+        <TeamRegistrationForm
+          event={event}
+          onSuccess={handleTeamRegistrationSuccess}
+          onCancel={() => setShowTeamRegistration(false)}
         />
       )}
     </div>

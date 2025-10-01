@@ -18,10 +18,14 @@ import toast from 'react-hot-toast';
 import { Event } from '../types';
 import { dataService } from '../services/dataService';
 import { excelService } from '../services/excelService';
+import { eventLeadExportService } from '../services/eventLeadExportService';
+import { roleAuthService, RoleUser } from '../services/roleAuth';
+import RoleLogin from '../components/RoleLogin';
 import OfflineRegistration from '../components/OfflineRegistration';
 
 const AdminPage: React.FC = () => {
   const navigate = useNavigate();
+  const [user, setUser] = useState<RoleUser | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -32,27 +36,37 @@ const AdminPage: React.FC = () => {
     time: '',
     location: '',
     entryFee: 0,
+    maxParticipants: 0,
     paymentMethod: 'both' as 'online' | 'offline' | 'both',
     upiId: '',
+    isTeamEvent: false,
+    teamSize: 1,
   });
   const [showOfflineRegistration, setShowOfflineRegistration] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   useEffect(() => {
-    const loadEvents = async () => {
-      try {
-        const eventsData = await dataService.getEvents();
-        setEvents(eventsData);
-      } catch (error) {
-        console.error('Error loading events:', error);
-        toast.error('Failed to load events');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadEvents();
+    // Check if user is already logged in
+    const currentUser = roleAuthService.getCurrentUser();
+    if (currentUser && currentUser.role === 'admin') {
+      setUser(currentUser);
+      loadEvents();
+    } else {
+      setLoading(false);
+    }
   }, []);
+
+  const loadEvents = async () => {
+    try {
+      const eventsData = await dataService.getEvents();
+      setEvents(eventsData);
+    } catch (error) {
+      console.error('Error loading events:', error);
+      toast.error('Failed to load events');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,8 +86,11 @@ const AdminPage: React.FC = () => {
         time: '',
         location: '',
         entryFee: 0,
+        maxParticipants: 0,
         paymentMethod: 'both',
         upiId: '',
+        isTeamEvent: false,
+        teamSize: 1,
       });
       
       // Reload events
@@ -85,9 +102,36 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  const handleExportAll = () => {
-    excelService.exportEventSummary(events);
-    toast.success('Events exported successfully!');
+  const handleExportAll = async () => {
+    try {
+      await excelService.exportEventSummary(events);
+      toast.success('Events exported successfully!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export events');
+    }
+  };
+
+  const handleExportEventParticipants = async (event: Event) => {
+    try {
+      const participants = await dataService.getParticipantsByEvent(event.id);
+      await eventLeadExportService.exportEventParticipants(event.id, participants, event);
+      toast.success('Event participants exported successfully!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export event participants');
+    }
+  };
+
+  const handleExportTeamDetails = async (event: Event) => {
+    try {
+      const participants = await dataService.getParticipantsByEvent(event.id);
+      await eventLeadExportService.exportTeamDetails(event.id, participants, event);
+      toast.success('Team details exported successfully!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export team details');
+    }
   };
 
   const handleOfflineRegistration = (event: Event) => {
@@ -109,7 +153,14 @@ const AdminPage: React.FC = () => {
     loadEvents();
   };
 
+  const handleLogin = (loggedInUser: RoleUser) => {
+    setUser(loggedInUser);
+    loadEvents();
+  };
+
   const handleLogout = () => {
+    roleAuthService.logout();
+    setUser(null);
     toast.success('Logged out successfully');
     navigate('/');
   };
@@ -131,6 +182,14 @@ const AdminPage: React.FC = () => {
     );
   }
 
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <RoleLogin onLogin={handleLogin} role="admin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
@@ -139,6 +198,7 @@ const AdminPage: React.FC = () => {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+              <span className="ml-4 text-gray-400">Welcome, {user.name}</span>
             </div>
             <div className="flex items-center space-x-4">
               <button
@@ -332,6 +392,20 @@ const AdminPage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Max Participants (0 = unlimited)
+                </label>
+                <input
+                  type="number"
+                  value={newEvent.maxParticipants}
+                  onChange={(e) => setNewEvent({ ...newEvent, maxParticipants: parseInt(e.target.value) || 0 })}
+                  className="input-field"
+                  placeholder="Enter max participants (0 for unlimited)"
+                  min="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Payment Method *
                 </label>
                 <select
@@ -436,6 +510,22 @@ const AdminPage: React.FC = () => {
                       >
                         <Eye className="h-4 w-4 text-gray-400" />
                       </Link>
+                      <button
+                        onClick={() => handleExportEventParticipants(event)}
+                        className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
+                        title="Export Participants"
+                      >
+                        <Download className="h-4 w-4 text-blue-400" />
+                      </button>
+                      {event.isTeamEvent && (
+                        <button
+                          onClick={() => handleExportTeamDetails(event)}
+                          className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
+                          title="Export Team Details"
+                        >
+                          <Users className="h-4 w-4 text-purple-400" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleOfflineRegistration(event)}
                         className="p-2 hover:bg-gray-600 rounded-lg transition-colors"

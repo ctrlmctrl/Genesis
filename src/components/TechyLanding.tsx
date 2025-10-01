@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Users, QrCode, Shield, Sparkles, Zap } from 'lucide-react';
+import { Calendar, Users, Sparkles, Zap, User, MapPin, DollarSign } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Event } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -103,47 +103,50 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, loading }) => {
           )}
         </motion.div>
 
-        {/* Quick Actions */}
-        <motion.div
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12"
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1, duration: 0.8 }}
-        >
-          <Link
-            to="/volunteer/scanner"
-            className="card-glow hover:scale-105 transition-all duration-300 group"
-          >
-            <div className="text-center">
-              <motion.div
-                className="mb-4"
-                whileHover={{ rotate: 360 }}
-                transition={{ duration: 0.5 }}
+            {/* Quick Actions */}
+            <motion.div
+              className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12"
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1, duration: 0.8 }}
+            >
+              <Link
+                to="/participant"
+                className="card-glow hover:scale-105 transition-all duration-300 group"
               >
-                <QrCode className="h-12 w-12 mx-auto text-cyan-400 group-hover:text-cyan-300" />
-              </motion.div>
-              <h3 className="text-xl font-semibold text-white mb-2">Volunteer Scanner</h3>
-              <p className="text-gray-400">Advanced QR code scanning technology</p>
-            </div>
-          </Link>
-          
-          <Link
-            to="/admin"
-            className="card-glow hover:scale-105 transition-all duration-300 group"
-          >
-            <div className="text-center">
-              <motion.div
-                className="mb-4"
-                whileHover={{ scale: 1.1 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Shield className="h-12 w-12 mx-auto text-blue-400 group-hover:text-blue-300" />
-              </motion.div>
-              <h3 className="text-xl font-semibold text-white mb-2">Admin Panel</h3>
-              <p className="text-gray-400">Event management dashboard</p>
-            </div>
-          </Link>
-        </motion.div>
+                <div className="text-center">
+                  <motion.div
+                    className="mb-4"
+                    whileHover={{ rotate: 360 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <User className="h-12 w-12 mx-auto text-green-400 group-hover:text-green-300" />
+                  </motion.div>
+                  <h3 className="text-xl font-semibold text-white mb-2">My Events</h3>
+                  <p className="text-gray-400">View your registrations and QR codes</p>
+                </div>
+              </Link>
+              
+              <div className="card-glow p-6">
+                <div className="text-center">
+                  <h3 className="text-xl font-semibold text-white mb-4">Staff Access</h3>
+                  <div className="space-y-3">
+                    <Link
+                      to="/volunteer"
+                      className="block w-full px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-colors text-sm"
+                    >
+                      Volunteer Dashboard
+                    </Link>
+                    <Link
+                      to="/admin"
+                      className="block w-full px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors text-sm"
+                    >
+                      Admin Dashboard
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
 
         {/* Events Section */}
         <motion.div
@@ -202,9 +205,21 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, loading }) => {
                     {formatDate(event.date)} at {event.time}
                   </div>
                   <div className="flex items-center text-gray-400">
-                    <Users className="h-4 w-4 mr-3 text-cyan-400" />
+                    <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
                     {event.location}
                   </div>
+                  {event.entryFee > 0 && (
+                    <div className="flex items-center text-cyan-400">
+                      <DollarSign className="h-4 w-4 mr-3" />
+                      Entry Fee: ₹{event.entryFee}
+                    </div>
+                  )}
+                  {event.isTeamEvent && (
+                    <div className="flex items-center text-purple-400">
+                      <Users className="h-4 w-4 mr-3" />
+                      Team Event ({event.teamSize} members)
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex items-center justify-between">

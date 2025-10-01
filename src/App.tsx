@@ -6,6 +6,9 @@ import Home from './pages/Home';
 import EventRegistration from './pages/EventRegistration';
 import QRCodeDisplay from './pages/QRCodeDisplay';
 import VolunteerScanner from './pages/VolunteerScanner';
+import VolunteerDashboard from './pages/VolunteerDashboard';
+import VolunteerAnalytics from './pages/VolunteerAnalytics';
+import ParticipantDashboard from './pages/ParticipantDashboard';
 import AdminPage from './pages/AdminPage';
 import EventDetails from './pages/EventDetails';
 import ParticipantInfo from './pages/ParticipantInfo';
@@ -36,7 +39,10 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/register/:eventId" element={<EventRegistration />} />
             <Route path="/qr/:participantId" element={<QRCodeDisplay />} />
+            <Route path="/participant" element={<ParticipantDashboard />} />
+            <Route path="/volunteer" element={<VolunteerDashboard />} />
             <Route path="/volunteer/scanner" element={<VolunteerScanner />} />
+            <Route path="/volunteer/analytics" element={<VolunteerAnalytics />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/events/:eventId" element={<EventDetails />} />
             <Route path="/participant-info/:participantId" element={<ParticipantInfo />} />

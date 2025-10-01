@@ -61,11 +61,16 @@ const EventDetails: React.FC = () => {
     });
   };
 
-  const exportParticipants = () => {
+  const exportParticipants = async () => {
     if (!event) return;
     
-    excelService.exportParticipantsToExcel(participants, event);
-    toast.success('Participants exported to Excel successfully!');
+    try {
+      await excelService.exportParticipantsToExcel(participants, event);
+      toast.success('Participants exported successfully!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export participants');
+    }
   };
 
   if (loading) {
@@ -236,7 +241,7 @@ const EventDetails: React.FC = () => {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h4 className="font-semibold text-gray-900">
-                      {participant.firstName} {participant.lastName}
+                      {participant.fullName}
                     </h4>
                     <p className="text-sm text-gray-600">{participant.email}</p>
                   </div>

@@ -14,10 +14,10 @@ interface OfflineRegistrationProps {
 }
 
 interface OfflineRegistrationForm {
-  firstName: string;
-  lastName: string;
+  fullName: string;
   email: string;
   phone: string;
+  college: string;
   amountPaid: number;
   receiptNumber: string;
   notes?: string;
@@ -46,10 +46,10 @@ const OfflineRegistration: React.FC<OfflineRegistrationProps> = ({
       // Register participant
       const participant = await dataService.registerParticipant({
         eventId: event.id,
-        firstName: data.firstName,
-        lastName: data.lastName,
+        fullName: data.fullName,
         email: data.email,
         phone: data.phone,
+        college: data.college,
       });
 
       // Update payment status for offline payment
@@ -132,31 +132,16 @@ const OfflineRegistration: React.FC<OfflineRegistrationProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  First Name *
+                  Full Name *
                 </label>
                 <input
                   type="text"
-                  {...register('firstName', { required: 'First name is required' })}
+                  {...register('fullName', { required: 'Full name is required' })}
                   className="input-field"
-                  placeholder="Enter first name"
+                  placeholder="Enter full name"
                 />
-                {errors.firstName && (
-                  <p className="text-red-400 text-sm mt-1">{errors.firstName.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Last Name *
-                </label>
-                <input
-                  type="text"
-                  {...register('lastName', { required: 'Last name is required' })}
-                  className="input-field"
-                  placeholder="Enter last name"
-                />
-                {errors.lastName && (
-                  <p className="text-red-400 text-sm mt-1">{errors.lastName.message}</p>
+                {errors.fullName && (
+                  <p className="text-red-400 text-sm mt-1">{errors.fullName.message}</p>
                 )}
               </div>
             </div>
@@ -203,6 +188,21 @@ const OfflineRegistration: React.FC<OfflineRegistrationProps> = ({
                   <p className="text-red-400 text-sm mt-1">{errors.phone.message}</p>
                 )}
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                College/Institution *
+              </label>
+              <input
+                type="text"
+                {...register('college', { required: 'College/Institution is required' })}
+                className="input-field"
+                placeholder="Enter college or institution name"
+              />
+              {errors.college && (
+                <p className="text-red-400 text-sm mt-1">{errors.college.message}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

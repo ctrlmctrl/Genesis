@@ -6,10 +6,13 @@ export interface Event {
   time: string;
   location: string;
   currentParticipants: number;
+  maxParticipants?: number; // Added back for admin control
   isActive: boolean;
   entryFee: number;
   paymentMethod: 'online' | 'offline' | 'both';
   upiId?: string;
+  isTeamEvent: boolean;
+  teamSize?: number; // Number of team members required
   createdAt: string;
   updatedAt: string;
 }
@@ -17,15 +20,17 @@ export interface Event {
 export interface Participant {
   id: string;
   eventId: string;
-  firstName: string;
-  lastName: string;
+  fullName: string; // Merged first and last name
   email: string;
   phone: string;
+  college: string; // Added college name
   registrationDate: string;
   qrCode: string;
   isVerified: boolean;
   verificationTime?: string;
-  additionalInfo?: ParticipantInfo;
+  teamId?: string; // For team events
+  teamName?: string; // For team events
+  isTeamLead?: boolean; // For team events
   paymentStatus: 'pending' | 'paid' | 'offline_paid';
   paymentMethod?: 'online' | 'offline';
   paymentId?: string;

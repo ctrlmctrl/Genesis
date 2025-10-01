@@ -4,30 +4,30 @@
   "description": "Mobile-first event registration and QR code verification system",
   "private": true,
   "dependencies": {
-    "@google-cloud/firestore": "^7.11.6",
-    "@types/node": "^24.5.2",
+    "@google-cloud/firestore": "^7.0.0",
+    "@types/node": "^20.0.0",
     "@types/qrcode": "^1.5.0",
-    "@types/react": "^19.1.14",
-    "@types/react-dom": "^19.1.9",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
     "autoprefixer": "^10.4.14",
     "axios": "^1.4.0",
-    "date-fns": "^4.1.0",
+    "date-fns": "^2.30.0",
+    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
-    "firebase": "^12.3.0",
-    "framer-motion": "^12.23.22",
+    "firebase": "^11.10.0",
+    "framer-motion": "^10.16.0",
     "html5-qrcode": "^2.3.8",
-    "lucide-react": "^0.544.0",
-    "postcss": "^8.4.24",
+    "lucide-react": "^0.263.1",
+    "postcss": "^8.4.31",
     "qrcode": "^1.5.3",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-hook-form": "^7.45.0",
     "react-hot-toast": "^2.4.1",
-    "react-router-dom": "^7.9.3",
-    "react-scripts": "^0.0.0",
-    "tailwindcss": "^4.1.13",
-    "typescript": "^5.9.2",
-    "xlsx": "^0.18.5"
+    "react-router-dom": "^6.4.0",
+    "react-scripts": "^5.0.1",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^4.9.0"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -55,6 +55,6 @@
   },
   "devDependencies": {
     "@types/file-saver": "^2.0.5",
-    "@types/jest": "^30.0.0"
+    "@types/jest": "^27.5.2"
   }
 }

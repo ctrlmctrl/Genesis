@@ -1,38 +1,15 @@
-// Google OAuth configuration
-const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || 'your-google-client-id';
+// Remove User import since we're using GoogleUser interface
+import { 
+  signInWithPopup, 
+  signOut as firebaseSignOut, 
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { auth } from '../firebase';
 
-// Mock Google API for development
-const mockGoogleAPI = {
-  load: (api: string, callback: () => void) => {
-    setTimeout(callback, 100);
-  },
-  auth2: {
-    init: (config: any) => Promise.resolve({
-      isSignedIn: {
-        get: () => false
-      },
-      currentUser: {
-        get: () => ({
-          getBasicProfile: () => ({
-            getId: () => 'mock-id',
-            getName: () => 'Mock User',
-            getEmail: () => 'mock@example.com',
-            getImageUrl: () => 'https://via.placeholder.com/150'
-          })
-        })
-      },
-      signIn: () => Promise.resolve({
-        getBasicProfile: () => ({
-          getId: () => 'mock-id',
-          getName: () => 'Mock User',
-          getEmail: () => 'mock@example.com',
-          getImageUrl: () => 'https://via.placeholder.com/150'
-        })
-      }),
-      signOut: () => Promise.resolve()
-    })
-  }
-};
+// Google OAuth configuration
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '848218204703-qb849bqu9nht5var8h8aqkhgmpee0k72.apps.googleusercontent.com';
 
 export interface GoogleUser {
   id: string;
@@ -42,104 +19,99 @@ export interface GoogleUser {
 }
 
 class GoogleAuthService {
-  private isGoogleLoaded = false;
+  private signedIn = false;
+  private currentUser: GoogleUser | null = null;
+  private authStateUnsubscribe: (() => void) | null = null;
 
   async initializeGoogleAuth(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.isGoogleLoaded) {
-        resolve();
-        return;
+    // Listen for authentication state changes
+    this.authStateUnsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+      if (firebaseUser) {
+        this.currentUser = {
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || 'Unknown User',
+          email: firebaseUser.email || '',
+          picture: firebaseUser.photoURL || 'https://via.placeholder.com/150',
+        };
+        this.signedIn = true;
+        
+        // Save to localStorage for persistence
+        localStorage.setItem('user', JSON.stringify(this.currentUser));
+      } else {
+        this.currentUser = null;
+        this.signedIn = false;
+        localStorage.removeItem('user');
       }
-
-      // Use mock API for development
-      if (GOOGLE_CLIENT_ID === 'your-google-client-id') {
-        window.gapi = mockGoogleAPI as any;
-        this.isGoogleLoaded = true;
-        resolve();
-        return;
-      }
-
-      // Load Google API script
-      const script = document.createElement('script');
-      script.src = 'https://apis.google.com/js/api.js';
-      script.onload = () => {
-        // Load Google Auth library
-        window.gapi.load('auth2', () => {
-          window.gapi.auth2.init({
-            client_id: GOOGLE_CLIENT_ID,
-          }).then(() => {
-            this.isGoogleLoaded = true;
-            resolve();
-          }).catch(reject);
-        });
-      };
-      script.onerror = reject;
-      document.head.appendChild(script);
     });
+
+    // Check if user is already signed in from localStorage
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        this.currentUser = JSON.parse(savedUser);
+        this.signedIn = true;
+      } catch (error) {
+        console.warn('Error parsing saved user:', error);
+        localStorage.removeItem('user');
+      }
+    }
   }
 
   async signIn(): Promise<GoogleUser> {
-    if (!this.isGoogleLoaded) {
-      await this.initializeGoogleAuth();
-    }
-
-    return new Promise((resolve, reject) => {
-      const authInstance = window.gapi.auth2.getAuthInstance();
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
       
-      authInstance.signIn().then((googleUser: any) => {
-        const profile = googleUser.getBasicProfile();
-        const user: GoogleUser = {
-          id: profile.getId(),
-          name: profile.getName(),
-          email: profile.getEmail(),
-          picture: profile.getImageUrl(),
-        };
-        resolve(user);
-      }).catch(reject);
-    });
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+      
+      const user: GoogleUser = {
+        id: firebaseUser.uid,
+        name: firebaseUser.displayName || 'Unknown User',
+        email: firebaseUser.email || '',
+        picture: firebaseUser.photoURL || 'https://via.placeholder.com/150',
+      };
+      
+      this.signedIn = true;
+      this.currentUser = user;
+      
+      // Save to localStorage
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      return user;
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      throw new Error('Failed to sign in with Google');
+    }
   }
 
   async signOut(): Promise<void> {
-    if (!this.isGoogleLoaded) {
-      return;
+    try {
+      await firebaseSignOut(auth);
+      this.signedIn = false;
+      this.currentUser = null;
+      localStorage.removeItem('user');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      throw new Error('Failed to sign out');
     }
-
-    const authInstance = window.gapi.auth2.getAuthInstance();
-    return authInstance.signOut();
-  }
-
-  isSignedIn(): boolean {
-    if (!this.isGoogleLoaded) {
-      return false;
-    }
-
-    const authInstance = window.gapi.auth2.getAuthInstance();
-    return authInstance.isSignedIn.get();
   }
 
   getCurrentUser(): GoogleUser | null {
-    if (!this.isGoogleLoaded || !this.isSignedIn()) {
-      return null;
+    return this.currentUser;
+  }
+
+  isSignedIn(): boolean {
+    return this.signedIn;
+  }
+
+  // Cleanup method
+  cleanup(): void {
+    if (this.authStateUnsubscribe) {
+      this.authStateUnsubscribe();
     }
-
-    const authInstance = window.gapi.auth2.getAuthInstance();
-    const googleUser = authInstance.currentUser.get();
-    const profile = googleUser.getBasicProfile();
-
-    return {
-      id: profile.getId(),
-      name: profile.getName(),
-      email: profile.getEmail(),
-      picture: profile.getImageUrl(),
-    };
   }
 }
 
 export const googleAuthService = new GoogleAuthService();
-
-// Extend Window interface for Google API
-declare global {
-  interface Window {
-    gapi: any;
-  }
-}

@@ -1,53 +1,104 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Camera, CheckCircle, AlertCircle, QrCode } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Participant } from '../types';
 import { dataService } from '../services/dataService';
+import { roleAuthService, RoleUser } from '../services/roleAuth';
+import RoleLogin from '../components/RoleLogin';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 const VolunteerScanner: React.FC = () => {
   const navigate = useNavigate();
+  const [user, setUser] = useState<RoleUser | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [showResult, setShowResult] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerElementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Check if user is already logged in
+    const currentUser = roleAuthService.getCurrentUser();
+    if (currentUser && currentUser.role === 'volunteer') {
+      setUser(currentUser);
+    }
+
     return () => {
-      // Cleanup camera stream when component unmounts
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+      // Cleanup scanner when component unmounts
+      if (scannerRef.current) {
+        scannerRef.current.clear();
       }
     };
   }, []);
 
   const startScanning = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } // Use back camera on mobile
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
+      if (scannerElementRef.current) {
+        scannerRef.current = new Html5QrcodeScanner(
+          "qr-reader",
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 }
+          },
+          false
+        );
+
+        scannerRef.current.render(
+          async (decodedText) => {
+            // QR code scanned successfully
+            await handleQRCodeScanned(decodedText);
+          },
+          (error) => {
+            // QR code scan error (usually just no QR code in view)
+            // Don't show error for normal scanning
+          }
+        );
+
         setIsScanning(true);
         setShowResult(false);
       }
     } catch (error) {
-      console.error('Error accessing camera:', error);
-      toast.error('Camera access denied. Please allow camera access to scan QR codes.');
+      console.error('Error starting scanner:', error);
+      toast.error('Failed to start camera. Please allow camera access.');
     }
   };
 
   const stopScanning = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+    if (scannerRef.current) {
+      scannerRef.current.clear();
+      scannerRef.current = null;
     }
     setIsScanning(false);
     setShowResult(false);
+  };
+
+  const handleQRCodeScanned = async (decodedText: string) => {
+    try {
+      // Extract participant ID from QR code
+      const participantId = decodedText.split('/').pop();
+      if (!participantId) {
+        toast.error('Invalid QR code format');
+        return;
+      }
+
+      // Find participant by ID
+      const participants = await dataService.getParticipants();
+      const foundParticipant = participants.find((p: Participant) => p.id === participantId);
+      
+      if (!foundParticipant) {
+        toast.error('Participant not found');
+        return;
+      }
+
+      setParticipant(foundParticipant);
+      setShowResult(true);
+      stopScanning();
+    } catch (error) {
+      console.error('Error processing QR code:', error);
+      toast.error('Failed to process QR code');
+    }
   };
 
 
@@ -77,24 +128,38 @@ const VolunteerScanner: React.FC = () => {
     setShowResult(false);
   };
 
+  const handleLogin = (loggedInUser: RoleUser) => {
+    setUser(loggedInUser);
+  };
+
+  if (!user) {
+    return (
+      <div className="mobile-container">
+        <div className="flex items-center justify-center min-h-screen">
+          <RoleLogin onLogin={handleLogin} role="volunteer" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mobile-container">
       {/* Header */}
       <div className="flex items-center mb-6">
         <button
-          onClick={() => navigate('/')}
-          className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          onClick={() => navigate('/volunteer')}
+          className="mr-4 p-2 hover:bg-gray-800 rounded-lg transition-colors"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-5 w-5 text-white" />
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">QR Code Scanner</h1>
+        <h1 className="text-2xl font-bold text-white neon-text">QR Code Scanner</h1>
       </div>
 
       {!isScanning && !showResult && (
-        <div className="card text-center">
-          <Camera className="h-16 w-16 mx-auto mb-4 text-primary-600" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Volunteer Scanner</h2>
-          <p className="text-gray-600 mb-6">
+        <div className="card-glow text-center">
+          <QrCode className="h-16 w-16 mx-auto mb-4 text-cyan-400" />
+          <h2 className="text-xl font-semibold text-white mb-2">Volunteer Scanner</h2>
+          <p className="text-gray-300 mb-6">
             Scan participant QR codes to verify their attendance at the event.
           </p>
           
@@ -109,22 +174,9 @@ const VolunteerScanner: React.FC = () => {
       )}
 
       {isScanning && (
-        <div className="card">
+        <div className="card-glow">
           <div className="relative">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              className="w-full h-64 bg-gray-900 rounded-lg"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="border-2 border-white rounded-lg w-48 h-48 flex items-center justify-center">
-                <div className="text-white text-center">
-                  <Camera className="h-8 w-8 mx-auto mb-2" />
-                  <p className="text-sm">Position QR code here</p>
-                </div>
-              </div>
-            </div>
+            <div id="qr-reader" ref={scannerElementRef} className="w-full"></div>
           </div>
           
           <div className="mt-4 text-center">
@@ -139,19 +191,19 @@ const VolunteerScanner: React.FC = () => {
       )}
 
       {showResult && participant && (
-        <div className="card">
+        <div className="card-glow">
           <div className="text-center mb-6">
             {participant.isVerified ? (
-              <CheckCircle className="h-16 w-16 mx-auto mb-4 text-green-500" />
+              <CheckCircle className="h-16 w-16 mx-auto mb-4 text-green-400" />
             ) : (
-              <AlertCircle className="h-16 w-16 mx-auto mb-4 text-yellow-500" />
+              <AlertCircle className="h-16 w-16 mx-auto mb-4 text-yellow-400" />
             )}
             
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            <h2 className="text-xl font-semibold text-white mb-2">
               {participant.isVerified ? 'Already Verified' : 'Participant Found'}
             </h2>
             
-            <p className="text-gray-600">
+            <p className="text-gray-300">
               {participant.isVerified 
                 ? 'This participant has already been verified.' 
                 : 'Review participant details and verify attendance.'
@@ -160,33 +212,46 @@ const VolunteerScanner: React.FC = () => {
           </div>
 
           {/* Participant Details */}
-          <div className="bg-gray-50 p-4 rounded-lg mb-6">
-            <h3 className="font-semibold text-gray-900 mb-3">Participant Information</h3>
+          <div className="bg-gray-800/50 p-4 rounded-lg mb-6">
+            <h3 className="font-semibold text-white mb-3">Participant Information</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Name:</span>
-                <span className="font-medium">{participant.firstName} {participant.lastName}</span>
+                <span className="text-gray-400">Name:</span>
+                <span className="font-medium text-white">{participant.fullName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Email:</span>
-                <span className="font-medium">{participant.email}</span>
+                <span className="text-gray-400">Email:</span>
+                <span className="font-medium text-white">{participant.email}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Phone:</span>
-                <span className="font-medium">{participant.phone}</span>
+                <span className="text-gray-400">Phone:</span>
+                <span className="font-medium text-white">{participant.phone}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Registration Date:</span>
-                <span className="font-medium">
+                <span className="text-gray-400">Registration Date:</span>
+                <span className="font-medium text-white">
                   {new Date(participant.registrationDate).toLocaleDateString()}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Status:</span>
+                <span className="text-gray-400">Payment Status:</span>
+                <span className={`px-2 py-1 rounded-full text-xs ${
+                  participant.paymentStatus === 'paid' 
+                    ? 'bg-green-500/20 text-green-400' 
+                    : participant.paymentStatus === 'offline_paid'
+                    ? 'bg-blue-500/20 text-blue-400'
+                    : 'bg-yellow-500/20 text-yellow-400'
+                }`}>
+                  {participant.paymentStatus === 'paid' ? 'Paid' :
+                   participant.paymentStatus === 'offline_paid' ? 'Offline Paid' : 'Pending'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Verification Status:</span>
                 <span className={`px-2 py-1 rounded-full text-xs ${
                   participant.isVerified 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-yellow-100 text-yellow-800'
+                    ? 'bg-green-500/20 text-green-400' 
+                    : 'bg-yellow-500/20 text-yellow-400'
                 }`}>
                   {participant.isVerified ? 'Verified' : 'Pending'}
                 </span>
@@ -218,9 +283,9 @@ const VolunteerScanner: React.FC = () => {
       )}
 
       {/* Instructions */}
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-        <h4 className="font-semibold text-blue-900 mb-2">Scanner Instructions:</h4>
-        <ul className="text-sm text-blue-800 space-y-1">
+      <div className="mt-6 p-4 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+        <h4 className="font-semibold text-cyan-400 mb-2">Scanner Instructions:</h4>
+        <ul className="text-sm text-gray-300 space-y-1">
           <li>• Allow camera access when prompted</li>
           <li>• Position the QR code within the scanning area</li>
           <li>• Ensure good lighting for better scanning</li>

@@ -54,11 +54,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         }
       } catch (error) {
-        console.error('Error initializing Google Auth:', error);
+        console.warn('Using fallback authentication method');
         // Fallback to localStorage
         const savedUser = localStorage.getItem('user');
         if (savedUser) {
-          setUser(JSON.parse(savedUser));
+          try {
+            setUser(JSON.parse(savedUser));
+          } catch (parseError) {
+            console.warn('Error parsing saved user data');
+            localStorage.removeItem('user');
+          }
         }
       } finally {
         setLoading(false);
@@ -66,6 +71,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     initializeAuth();
+
+    // Cleanup on unmount
+    return () => {
+      googleAuthService.cleanup();
+    };
   }, []);
 
   const login = async () => {
@@ -75,10 +85,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const googleUser = await googleAuthService.signIn();
       setUser(googleUser);
       localStorage.setItem('user', JSON.stringify(googleUser));
-      toast.success('Successfully logged in with Google!');
+      toast.success('Successfully logged in!');
     } catch (error) {
       console.error('Login error:', error);
-      toast.error('Failed to login with Google');
+      toast.error('Failed to login. Please try again.');
     } finally {
       setLoading(false);
     }
