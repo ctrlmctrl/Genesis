@@ -60,11 +60,20 @@ class GoogleAuthService {
   async signIn(): Promise<GoogleUser> {
     try {
       const provider = new GoogleAuthProvider();
+      
+      // Configure provider settings
       provider.addScope('email');
       provider.addScope('profile');
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
       
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
+      
+      if (!firebaseUser) {
+        throw new Error('No user data received from Google');
+      }
       
       const user: GoogleUser = {
         id: firebaseUser.uid,
@@ -80,9 +89,21 @@ class GoogleAuthService {
       localStorage.setItem('user', JSON.stringify(user));
       
       return user;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Google sign-in error:', error);
-      throw new Error('Failed to sign in with Google');
+      
+      // Handle specific error cases
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error('Sign-in cancelled by user');
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error('Popup blocked by browser. Please allow popups and try again.');
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        throw new Error('Another sign-in popup is already open');
+      } else if (error.code === 'auth/network-request-failed') {
+        throw new Error('Network error. Please check your internet connection.');
+      } else {
+        throw new Error(`Sign-in failed: ${error.message || 'Unknown error'}`);
+      }
     }
   }
 

@@ -85,10 +85,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const googleUser = await googleAuthService.signIn();
       setUser(googleUser);
       localStorage.setItem('user', JSON.stringify(googleUser));
-      toast.success('Successfully logged in!');
-    } catch (error) {
+      toast.success(`Welcome, ${googleUser.name}!`);
+    } catch (error: any) {
       console.error('Login error:', error);
-      toast.error('Failed to login. Please try again.');
+      
+      // Show specific error message from the service
+      const errorMessage = error.message || 'Failed to login. Please try again.';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
