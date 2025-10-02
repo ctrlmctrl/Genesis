@@ -1,62 +1,157 @@
 import { Event, Participant, ParticipantInfo, VerificationRecord } from '../types';
 import { localStorageService } from './localStorageService';
+import { 
+  collection, 
+  doc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  getDocs, 
+  getDoc, 
+  query, 
+  where,
+  serverTimestamp,
+  Timestamp
+} from 'firebase/firestore';
+import { db } from '../firebase';
 
-// In a real application, this would be replaced with actual API calls
+// Storage mode: 'firebase' | 'localStorage' | 'memory'
+const STORAGE_MODE = process.env.REACT_APP_STORAGE_MODE || 'firebase';
+
 class DataService {
   private events: Event[] = [];
   private participants: Participant[] = [];
   private verificationRecords: VerificationRecord[] = [];
+  private useFirebase: boolean;
 
   constructor() {
-    this.loadDataFromStorage();
-    if (this.events.length === 0) {
-      this.initializeSampleData();
-    }
+    this.useFirebase = STORAGE_MODE === 'firebase';
+    this.initializeData();
   }
 
-  private async loadDataFromStorage(): Promise<void> {
+  private async initializeData(): Promise<void> {
     try {
-      // For now, use localStorage directly since storageService integration needs more work
+      if (this.useFirebase) {
+        // Initialize with Firebase - no need to load all data upfront
+        await this.ensureSampleDataExists();
+      } else {
+        // Use localStorage for development/testing
+        this.events = localStorageService.getEvents();
+        this.participants = localStorageService.getParticipants();
+        this.verificationRecords = localStorageService.getVerificationRecords();
+        
+        if (this.events.length === 0) {
+          this.initializeSampleData();
+        }
+      }
+    } catch (error) {
+      console.error('Error initializing data:', error);
+      // Fallback to localStorage
+      this.useFirebase = false;
       this.events = localStorageService.getEvents();
       this.participants = localStorageService.getParticipants();
       this.verificationRecords = localStorageService.getVerificationRecords();
+    }
+  }
+
+  private async ensureSampleDataExists(): Promise<void> {
+    try {
+      const eventsSnapshot = await getDocs(collection(db, 'events'));
+      if (eventsSnapshot.empty) {
+        console.log('No events found, creating sample data...');
+        await this.createSampleFirebaseData();
+      }
     } catch (error) {
-      console.error('Error loading data from storage:', error);
+      console.error('Error checking sample data:', error);
     }
   }
 
   private async saveDataToStorage(): Promise<void> {
-    try {
-      // Use localStorage directly for now
-      localStorageService.saveEvents(this.events);
-      localStorageService.saveParticipants(this.participants);
-      localStorageService.saveVerificationRecords(this.verificationRecords);
-    } catch (error) {
-      console.error('Error saving data to storage:', error);
+    if (!this.useFirebase) {
+      try {
+        localStorageService.saveEvents(this.events);
+        localStorageService.saveParticipants(this.participants);
+        localStorageService.saveVerificationRecords(this.verificationRecords);
+      } catch (error) {
+        console.error('Error saving data to storage:', error);
+      }
     }
+    // Firebase operations are handled individually in each method
   }
 
   // Event Management
   async createEvent(eventData: Omit<Event, 'id' | 'currentParticipants' | 'createdAt' | 'updatedAt'>): Promise<Event> {
-    const event: Event = {
-      ...eventData,
-      id: this.generateId(),
-      currentParticipants: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    
-    this.events.push(event);
-    this.saveDataToStorage();
-    return event;
+    if (this.useFirebase) {
+      try {
+        const docRef = await addDoc(collection(db, 'events'), {
+          ...eventData,
+          currentParticipants: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        
+        const event: Event = {
+          ...eventData,
+          id: docRef.id,
+          currentParticipants: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        
+        return event;
+      } catch (error) {
+        console.error('Error creating event in Firebase:', error);
+        throw new Error('Failed to create event');
+      }
+    } else {
+      const event: Event = {
+        ...eventData,
+        id: this.generateId(),
+        currentParticipants: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      
+      this.events.push(event);
+      this.saveDataToStorage();
+      return event;
+    }
   }
 
   async getEvents(): Promise<Event[]> {
-    return this.events.filter(event => event.isActive);
+    if (this.useFirebase) {
+      try {
+        const q = query(collection(db, 'events'), where('isActive', '==', true));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Event[];
+      } catch (error) {
+        console.error('Error getting events from Firebase:', error);
+        return [];
+      }
+    } else {
+      return this.events.filter(event => event.isActive);
+    }
   }
 
   async getEvent(eventId: string): Promise<Event | null> {
-    return this.events.find(event => event.id === eventId) || null;
+    if (this.useFirebase) {
+      try {
+        const docRef = doc(db, 'events', eventId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          return { id: docSnap.id, ...docSnap.data() } as Event;
+        }
+        return null;
+      } catch (error) {
+        console.error('Error getting event from Firebase:', error);
+        return null;
+      }
+    } else {
+      return this.events.find(event => event.id === eventId) || null;
+    }
   }
 
   async updateEvent(eventId: string, updates: Partial<Event>): Promise<Event | null> {

@@ -13,6 +13,14 @@ export interface Event {
   upiId?: string;
   isTeamEvent: boolean;
   teamSize?: number; // Number of team members required
+  
+  // Registration deadline fields
+  registrationStartDate?: string; // YYYY-MM-DD format
+  registrationStartTime?: string; // HH:MM format
+  registrationEndDate?: string;   // YYYY-MM-DD format
+  registrationEndTime?: string;   // HH:MM format
+  allowLateRegistration?: boolean; // Admin/volunteer override
+  
   createdAt: string;
   updatedAt: string;
 }
