@@ -40,8 +40,11 @@ function App() {
             <Route path="/qr/:participantId" element={<QRCodeDisplay />} />
             <Route path="/participant" element={<ParticipantDashboard />} />
             <Route path="/volunteer" element={<VolunteerDashboard />} />
+            <Route path="/vol" element={<VolunteerDashboard />} />
             <Route path="/volunteer/scanner" element={<VolunteerScanner />} />
+            <Route path="/vol/scanner" element={<VolunteerScanner />} />
             <Route path="/volunteer/analytics" element={<VolunteerAnalytics />} />
+            <Route path="/vol/analytics" element={<VolunteerAnalytics />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/events/:eventId" element={<EventDetails />} />
           </Routes>

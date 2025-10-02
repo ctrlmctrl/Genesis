@@ -103,31 +103,32 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, loading }) => {
           )}
         </motion.div>
 
-            {/* Quick Actions */}
-            <motion.div
-              className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12"
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1, duration: 0.8 }}
-            >
-              <Link
-                to="/participant"
-                className="card-glow hover:scale-105 transition-all duration-300 group"
+            {/* Quick Actions - Only show when authenticated */}
+            {isAuthenticated && (
+              <motion.div
+                className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12"
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1, duration: 0.8 }}
               >
-                <div className="text-center">
-                  <motion.div
-                    className="mb-4"
-                    whileHover={{ rotate: 360 }}
-                    transition={{ duration: 0.5 }}
-                  >
-                    <User className="h-12 w-12 mx-auto text-green-400 group-hover:text-green-300" />
-                  </motion.div>
-                  <h3 className="text-xl font-semibold text-white mb-2">My Events</h3>
-                  <p className="text-gray-400">View your registrations and QR codes</p>
-                </div>
-              </Link>
-              
-            </motion.div>
+                <Link
+                  to="/participant"
+                  className="card-glow hover:scale-105 transition-all duration-300 group"
+                >
+                  <div className="text-center">
+                    <motion.div
+                      className="mb-4"
+                      whileHover={{ rotate: 360 }}
+                      transition={{ duration: 0.5 }}
+                    >
+                      <User className="h-12 w-12 mx-auto text-green-400 group-hover:text-green-300" />
+                    </motion.div>
+                    <h3 className="text-xl font-semibold text-white mb-2">My Events</h3>
+                    <p className="text-gray-400">View your registrations and QR codes</p>
+                  </div>
+                </Link>
+              </motion.div>
+            )}
 
         {/* Events Section */}
         <motion.div
@@ -142,6 +143,21 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, loading }) => {
               Upcoming Events
             </h2>
             <div className="w-24 h-1 bg-gradient-to-r from-cyan-500 to-blue-500 mx-auto rounded-full"></div>
+            
+            {/* Sign-in prompt for events when not authenticated */}
+            {!isAuthenticated && (
+              <motion.div
+                className="mt-6 p-4 bg-cyan-500/10 rounded-lg border border-cyan-500/20"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 1.4, duration: 0.5 }}
+              >
+                <p className="text-cyan-300 mb-3">
+                  🎯 Sign in with Google to register for events
+                </p>
+                <GoogleLogin />
+              </motion.div>
+            )}
           </div>
           
           {loading ? (

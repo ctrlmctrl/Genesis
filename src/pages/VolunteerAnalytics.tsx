@@ -106,7 +106,7 @@ const VolunteerAnalytics: React.FC = () => {
       {/* Header */}
       <div className="flex items-center mb-6">
         <button
-          onClick={() => navigate('/volunteer')}
+          onClick={() => navigate(-1)}
           className="mr-4 p-2 hover:bg-gray-800 rounded-lg transition-colors"
         >
           <ArrowLeft className="h-5 w-5" />
