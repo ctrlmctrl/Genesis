@@ -1,0 +1,226 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions for authentication and authorization
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserId() {
+      return request.auth.uid;
+    }
+    
+    function getUserEmail() {
+      return request.auth.token.email;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/admins/$(getUserId()));
+    }
+    
+    function isVolunteer() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/volunteers/$(getUserId()));
+    }
+    
+    function isStaff() {
+      return isAdmin() || isVolunteer();
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && getUserId() == userId;
+    }
+    
+    function isParticipantOwner(participantData) {
+      return isAuthenticated() && getUserEmail() == participantData.email;
+    }
+    
+    // Admin collection - only admins can read/write
+    match /admins/{adminId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Volunteer collection - only admins can write, volunteers can read their own
+    match /volunteers/{volunteerId} {
+      allow read: if isOwner(volunteerId) || isAdmin();
+      allow write: if isAdmin();
+    }
+    
+    // Events collection
+    match /events/{eventId} {
+      // Anyone can read active events
+      allow read: if resource.data.isActive == true;
+      
+      // Only admins can create, update, or delete events
+      allow create, update, delete: if isAdmin();
+      
+      // Staff can read all events (including inactive)
+      allow read: if isStaff();
+    }
+    
+    // Participants collection
+    match /participants/{participantId} {
+      // Participants can read their own data
+      allow read: if isParticipantOwner(resource.data);
+      
+      // Participants can create their own registration
+      allow create: if isAuthenticated() && 
+                       getUserEmail() == request.resource.data.email &&
+                       validateParticipantData(request.resource.data);
+      
+      // Participants can update their own payment status and basic info
+      allow update: if isParticipantOwner(resource.data) && 
+                       validateParticipantUpdate(request.resource.data, resource.data);
+      
+      // Staff can read all participants
+      allow read: if isStaff();
+      
+      // Staff can update verification status and payment info
+      allow update: if isStaff() && 
+                       validateStaffUpdate(request.resource.data, resource.data);
+      
+      // Admins can delete participants
+      allow delete: if isAdmin();
+    }
+    
+    // Verification records collection
+    match /verification_records/{recordId} {
+      // Only staff can read verification records
+      allow read: if isStaff();
+      
+      // Only volunteers and admins can create verification records
+      allow create: if isStaff() && 
+                       validateVerificationRecord(request.resource.data);
+      
+      // Only admins can update or delete verification records
+      allow update, delete: if isAdmin();
+    }
+    
+    // Team registrations - special handling for team events
+    match /teams/{teamId} {
+      // Team members can read their team data
+      allow read: if isAuthenticated() && 
+                     getUserEmail() in resource.data.memberEmails;
+      
+      // Anyone can create a team (will be validated by functions)
+      allow create: if isAuthenticated() && 
+                       validateTeamData(request.resource.data);
+      
+      // Staff can read all teams
+      allow read: if isStaff();
+      
+      // Only admins can update or delete teams
+      allow update, delete: if isAdmin();
+    }
+    
+    // Payment records collection
+    match /payments/{paymentId} {
+      // Users can read their own payment records
+      allow read: if isAuthenticated() && 
+                     getUserEmail() == resource.data.userEmail;
+      
+      // Users can create their own payment records
+      allow create: if isAuthenticated() && 
+                       getUserEmail() == request.resource.data.userEmail &&
+                       validatePaymentData(request.resource.data);
+      
+      // Staff can read all payment records
+      allow read: if isStaff();
+      
+      // Only admins can update or delete payment records
+      allow update, delete: if isAdmin();
+    }
+    
+    // Validation functions
+    function validateParticipantData(data) {
+      return data.keys().hasAll(['fullName', 'email', 'phone', 'college', 'eventId']) &&
+             data.fullName is string && data.fullName.size() > 0 &&
+             data.email is string && data.email.matches('.*@.*\\..*') &&
+             data.phone is string && data.phone.size() > 0 &&
+             data.college is string && data.college.size() > 0 &&
+             data.eventId is string &&
+             data.registrationDate is timestamp &&
+             data.isVerified == false &&
+             data.paymentStatus in ['pending', 'paid', 'offline_paid'];
+    }
+    
+    function validateParticipantUpdate(newData, oldData) {
+      // Participants can only update certain fields
+      let allowedFields = ['paymentStatus', 'paymentMethod', 'paymentId', 'receiptUrl'];
+      let changedFields = newData.diff(oldData).changedKeys();
+      
+      return changedFields.hasOnly(allowedFields) &&
+             // Can't change verification status
+             newData.isVerified == oldData.isVerified &&
+             // Can't change core identity fields
+             newData.email == oldData.email &&
+             newData.eventId == oldData.eventId;
+    }
+    
+    function validateStaffUpdate(newData, oldData) {
+      // Staff can update verification and payment fields
+      let allowedFields = ['isVerified', 'verificationTime', 'paymentStatus', 
+                          'paymentMethod', 'paymentId', 'receiptUrl'];
+      let changedFields = newData.diff(oldData).changedKeys();
+      
+      return changedFields.hasOnly(allowedFields) &&
+             // Can't change core identity fields
+             newData.email == oldData.email &&
+             newData.eventId == oldData.eventId &&
+             newData.fullName == oldData.fullName;
+    }
+    
+    function validateVerificationRecord(data) {
+      return data.keys().hasAll(['participantId', 'volunteerId', 'verificationTime']) &&
+             data.participantId is string &&
+             data.volunteerId is string &&
+             data.verificationTime is timestamp;
+    }
+    
+    function validateTeamData(data) {
+      return data.keys().hasAll(['teamName', 'eventId', 'memberEmails', 'teamLeadEmail']) &&
+             data.teamName is string && data.teamName.size() > 0 &&
+             data.eventId is string &&
+             data.memberEmails is list &&
+             data.memberEmails.size() > 1 &&
+             data.teamLeadEmail in data.memberEmails &&
+             getUserEmail() in data.memberEmails;
+    }
+    
+    function validatePaymentData(data) {
+      return data.keys().hasAll(['userEmail', 'eventId', 'amount', 'method', 'status']) &&
+             data.userEmail is string &&
+             data.eventId is string &&
+             data.amount is number && data.amount >= 0 &&
+             data.method in ['online', 'offline'] &&
+             data.status in ['pending', 'completed', 'failed'] &&
+             data.timestamp is timestamp;
+    }
+    
+    // Analytics and reports - only for staff
+    match /analytics/{document=**} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+    
+    // System configuration - only for admins
+    match /config/{document=**} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Audit logs - read-only for staff, write for system
+    match /audit_logs/{logId} {
+      allow read: if isStaff();
+      // Audit logs are typically written by server-side functions
+      allow write: if false; // Disable direct writes
+    }
+    
+    // Default deny rule for any other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
