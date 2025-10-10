@@ -3,15 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, QrCode, ExternalLink, Upload, CheckCircle } from 'lucide-react';
 import { PaymentDetails } from '../services/paymentService';
 import { paymentService } from '../services/paymentService';
+import { fileUploadService } from '../services/fileUploadService';
 import toast from 'react-hot-toast';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onPaymentComplete: (paymentId: string, method: 'online' | 'offline') => void;
+  onPaymentComplete: (paymentId: string, method: 'online' | 'offline', receiptUrl?: string) => void;
   eventTitle: string;
   amount: number;
   upiId: string;
+  participantId?: string;
 }
 
 const PaymentModal: React.FC<PaymentModalProps> = ({
@@ -21,6 +23,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   eventTitle,
   amount,
   upiId,
+  participantId,
 }) => {
   const [qrCodeDataURL, setQrCodeDataURL] = useState<string>('');
   const [paymentId, setPaymentId] = useState<string>('');
@@ -77,10 +80,18 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     setIsProcessing(true);
     
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      let receiptUrl: string | undefined;
       
-      onPaymentComplete(paymentId, selectedMethod);
+      // If offline payment and receipt is uploaded, upload the receipt
+      if (selectedMethod === 'offline' && receiptFile && participantId) {
+        receiptUrl = await fileUploadService.uploadReceipt(receiptFile, participantId);
+        toast.success('Receipt uploaded successfully!');
+      }
+      
+      // Simulate payment processing
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      onPaymentComplete(paymentId, selectedMethod, receiptUrl);
       toast.success('Payment completed successfully!');
       onClose();
     } catch (error) {

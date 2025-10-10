@@ -71,7 +71,7 @@ export class ExcelService {
       { header: 'Entry Fee', key: 'entryFee', width: 15 },
       { header: 'Payment Method', key: 'paymentMethod', width: 15 },
       { header: 'Current Participants', key: 'currentParticipants', width: 20 },
-      { header: 'Max Participants', key: 'maxParticipants', width: 20 },
+      { header: 'Max Teams', key: 'maxTeams', width: 20 },
       { header: 'Status', key: 'status', width: 10 },
       { header: 'Created Date', key: 'createdDate', width: 15 },
     ];
@@ -88,7 +88,7 @@ export class ExcelService {
         entryFee: `₹${event.entryFee}`,
         paymentMethod: event.paymentMethod,
         currentParticipants: event.currentParticipants,
-        maxParticipants: event.maxParticipants || 'Unlimited',
+        maxTeams: event.maxTeams || 'Unlimited',
         status: event.isActive ? 'Active' : 'Inactive',
         createdDate: new Date(event.createdAt).toLocaleDateString(),
       });

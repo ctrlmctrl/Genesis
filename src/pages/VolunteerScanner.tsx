@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, CheckCircle, AlertCircle, QrCode } from 'lucide-react';
+import { ArrowLeft, Camera, QrCode, CheckCircle, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import QrScanner from 'qr-scanner';
 import { Participant } from '../types';
 import { dataService } from '../services/dataService';
 import { roleAuthService, RoleUser } from '../services/roleAuth';
 import RoleLogin from '../components/RoleLogin';
-import { Html5QrcodeScanner } from 'html5-qrcode';
 
 const VolunteerScanner: React.FC = () => {
   const navigate = useNavigate();
@@ -15,87 +15,201 @@ const VolunteerScanner: React.FC = () => {
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [showResult, setShowResult] = useState(false);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
-  const scannerElementRef = useRef<HTMLDivElement>(null);
+  const scannerRef = useRef<QrScanner | null>(null);
 
   useEffect(() => {
-    // Check if user is already logged in
     const currentUser = roleAuthService.getCurrentUser();
     if (currentUser && currentUser.role === 'volunteer') {
       setUser(currentUser);
     }
 
+    // Cleanup scanner on unmount
     return () => {
-      // Cleanup scanner when component unmounts
       if (scannerRef.current) {
-        scannerRef.current.clear();
+        scannerRef.current.destroy();
       }
     };
   }, []);
 
+  const handleLogin = (loggedInUser: RoleUser) => {
+    setUser(loggedInUser);
+  };
+
+  // const handleVideoReady = () => {
+  //   setVideoReady(true);
+  // };
+
   const startScanning = async () => {
     try {
-      if (scannerElementRef.current) {
-        scannerRef.current = new Html5QrcodeScanner(
-          "qr-reader",
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 }
-          },
-          false
-        );
-
-        scannerRef.current.render(
-          async (decodedText) => {
-            // QR code scanned successfully
-            await handleQRCodeScanned(decodedText);
-          },
-          (error) => {
-            // QR code scan error (usually just no QR code in view)
-            // Don't show error for normal scanning
-          }
-        );
-
-        setIsScanning(true);
-        setShowResult(false);
+      // Check if we're on mobile
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      // Check camera availability first
+      const hasCamera = await QrScanner.hasCamera();
+      
+      if (!hasCamera) {
+        throw new Error('No camera found on this device');
       }
-    } catch (error) {
-      console.error('Error starting scanner:', error);
-      toast.error('Failed to start camera. Please allow camera access.');
+      
+      // Stop any existing scanner
+      if (scannerRef.current) {
+        scannerRef.current.destroy();
+        scannerRef.current = null;
+      }
+
+      // Set scanning state first so video element gets rendered
+      setIsScanning(true);
+      setShowResult(false);
+      
+      // Wait longer for mobile devices to ensure video element is ready
+      const waitTime = isMobile ? 500 : 200;
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+
+      // Get video element
+      const videoElement = document.getElementById('qr-reader') as HTMLVideoElement;
+      if (!videoElement) {
+        throw new Error('Video element not found');
+      }
+
+      // Mobile-specific video element setup
+      if (isMobile) {
+        videoElement.setAttribute('playsinline', 'true');
+        videoElement.setAttribute('webkit-playsinline', 'true');
+        videoElement.setAttribute('x5-playsinline', 'true');
+        videoElement.setAttribute('x5-video-player-type', 'h5');
+        videoElement.setAttribute('x5-video-player-fullscreen', 'false');
+        videoElement.muted = true;
+        videoElement.playsInline = true;
+        videoElement.controls = false;
+        videoElement.autoplay = true;
+      }
+
+      // Create new QR scanner with mobile-optimized settings
+      const scanner = new QrScanner(
+        videoElement,
+        (result) => {
+          handleQRCodeScanned(result.data);
+        },
+        {
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
+          maxScansPerSecond: isMobile ? 2 : 5, // Even lower for mobile
+          preferredCamera: 'environment', // Use back camera on mobile
+          onDecodeError: (error: Error) => {
+            // Silently handle decode errors to avoid spam
+            console.debug('QR decode error:', error);
+          }
+        }
+      );
+
+      scannerRef.current = scanner;
+
+      // Start scanning with retry logic for mobile
+      let retryCount = 0;
+      const maxRetries = isMobile ? 5 : 2;
+      
+      while (retryCount < maxRetries) {
+        try {
+          await scanner.start();
+          break; // Success, exit retry loop
+        } catch (startError: any) {
+          retryCount++;
+          console.log(`Scanner start attempt ${retryCount} failed:`, startError);
+          
+          if (retryCount >= maxRetries) {
+            throw startError; // Re-throw if all retries failed
+          }
+          
+          // Wait before retry with increasing delay
+          const retryDelay = isMobile ? 1000 * retryCount : 500;
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+      }
+      
+      // Show mobile-specific success message
+      if (isMobile) {
+        toast.success('Scanner started! Point your camera at a QR code.', { duration: 5000 });
+      } else {
+        toast.success('Scanner started successfully!');
+      }
+      
+    } catch (error: any) {
+      // Reset scanning state on error
+      setIsScanning(false);
+      
+      let message = 'Scanner failed to start. ';
+      if (error.name === 'NotAllowedError') {
+        message += 'Camera permission denied. Please allow camera access and refresh the page.';
+      } else if (error.name === 'NotFoundError') {
+        message += 'No camera found on this device.';
+      } else if (error.name === 'NotReadableError') {
+        message += 'Camera is being used by another application. Please close other camera apps.';
+      } else if (error.name === 'OverconstrainedError') {
+        message += 'Camera constraints not supported. Try refreshing the page.';
+      } else if (error.name === 'SecurityError') {
+        message += 'Camera access blocked. Please check your browser settings.';
+      } else if (error.message?.includes('Video element not found')) {
+        message += 'Please try refreshing the page and try again.';
+      } else {
+        message += `Error: ${error.message}`;
+      }
+      
+      toast.error(message, { duration: 10000 });
     }
   };
 
-  const stopScanning = () => {
-    if (scannerRef.current) {
-      scannerRef.current.clear();
-      scannerRef.current = null;
+  const stopScanning = async () => {
+    try {
+      // Stop QR scanner
+      if (scannerRef.current) {
+        scannerRef.current.destroy();
+        scannerRef.current = null;
+      }
+      
+      setIsScanning(false);
+      setParticipant(null);
+      setShowResult(false);
+    } catch (error) {
+      console.error('Error stopping scanner:', error);
+      setIsScanning(false);
+      setParticipant(null);
+      setShowResult(false);
     }
-    setIsScanning(false);
-    setShowResult(false);
   };
+
+  // const handleScan = async (data: string | null) => {
+  //   if (data) {
+  //     console.log('QR Code scanned:', data);
+  //     await handleQRCodeScanned(data);
+  //   }
+  // };
+
+  // const handleError = (err: any) => {
+  //   console.error('QR Scanner error:', err);
+  //   if (!err.message?.includes('No QR code found')) {
+  //     toast.error('Scanner error: ' + err.message);
+  //   }
+  // };
 
   const handleQRCodeScanned = async (decodedText: string) => {
     try {
-      // Parse QR code data
-      const parts = decodedText.split(':');
-      if (parts.length < 4 || parts[0] !== 'EVENT') {
-        toast.error('Invalid QR code format');
-        return;
-      }
-
-      const participantId = parts[2]; // Third part is participant ID
+      console.log('QR Code scanned:', decodedText);
+      console.log('QR Code length:', decodedText.length);
+      console.log('QR Code type:', typeof decodedText);
       
-      // Find participant by ID
-      const foundParticipant = await dataService.getParticipant(participantId);
+      // Use the new QR code service to parse the unique code
+      const foundParticipant = await dataService.getParticipantByQRCode(decodedText);
+      console.log('Found participant by QR code:', foundParticipant);
       
       if (!foundParticipant) {
-        toast.error('Participant not found');
+        console.log('No participant found for QR code:', decodedText);
+        toast.error('Participant not found. Please register first.');
         return;
       }
 
       setParticipant(foundParticipant);
       setShowResult(true);
-      stopScanning();
+      setIsScanning(false);
     } catch (error) {
       console.error('Error processing QR code:', error);
       toast.error('Failed to process QR code');
@@ -108,8 +222,7 @@ const VolunteerScanner: React.FC = () => {
 
     setVerifying(true);
     try {
-      const success = await dataService.verifyParticipant(participant.id, 'volunteer-1'); // In real app, use actual volunteer ID
-      
+      const success = await dataService.verifyParticipant(participant.id, user?.id || 'volunteer');
       if (success) {
         toast.success('Participant verified successfully!');
         setParticipant({ ...participant, isVerified: true });
@@ -129,10 +242,6 @@ const VolunteerScanner: React.FC = () => {
     setShowResult(false);
   };
 
-  const handleLogin = (loggedInUser: RoleUser) => {
-    setUser(loggedInUser);
-  };
-
   if (!user) {
     return (
       <div className="mobile-container">
@@ -145,7 +254,6 @@ const VolunteerScanner: React.FC = () => {
 
   return (
     <div className="mobile-container">
-      {/* Header */}
       <div className="flex items-center mb-6">
         <button
           onClick={() => navigate(-1)}
@@ -153,40 +261,124 @@ const VolunteerScanner: React.FC = () => {
         >
           <ArrowLeft className="h-5 w-5 text-white" />
         </button>
-        <h1 className="text-2xl font-bold text-white neon-text">QR Code Scanner</h1>
+        <h1 className="text-2xl font-bold text-white neon-text">QR Scanner</h1>
       </div>
 
+      {/* Mobile-specific instructions */}
+      {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && (
+        <div className="card-glow mb-6 p-4 bg-blue-900/20 border border-blue-500/30">
+          <h3 className="text-lg font-semibold text-blue-300 mb-2 flex items-center">
+            <Camera className="h-5 w-5 mr-2" />
+            Mobile Scanning Tips
+          </h3>
+          <ul className="text-sm text-blue-200 space-y-1">
+            <li>• Hold your device steady and point at the QR code</li>
+            <li>• Ensure good lighting for better scanning</li>
+            <li>• Keep the QR code centered in the camera view</li>
+            <li>• Allow camera permissions when prompted</li>
+            <li>• If scanning fails, try refreshing the page</li>
+            <li>• Make sure no other apps are using the camera</li>
+          </ul>
+        </div>
+      )}
+
+
+
       {!isScanning && !showResult && (
-        <div className="card-glow text-center">
-          <QrCode className="h-16 w-16 mx-auto mb-4 text-cyan-400" />
-          <h2 className="text-xl font-semibold text-white mb-2">Volunteer Scanner</h2>
-          <p className="text-gray-300 mb-6">
-            Scan participant QR codes to verify their attendance at the event.
-          </p>
-          
-          <button
-            onClick={startScanning}
-            className="btn-primary w-full flex items-center justify-center"
-          >
-            <Camera className="h-4 w-4 mr-2" />
-            Start Scanning
-          </button>
+        <div className="space-y-6">
+          <div className="card-glow text-center">
+            <QrCode className="h-16 w-16 mx-auto mb-4 text-cyan-400" />
+            <h2 className="text-xl font-semibold text-white mb-2">Volunteer Scanner</h2>
+            <p className="text-gray-300 mb-6">
+              Scan participant QR codes to verify their attendance at the event.
+            </p>
+            
+            <div className="space-y-3">
+            <button
+              onClick={startScanning}
+                className="btn-primary w-full flex items-center justify-center text-lg py-4"
+            >
+                <Camera className="h-5 w-5 mr-2" />
+                Start Camera Scanning
+            </button>
+            
+            {/* Mobile-specific retry button */}
+            {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && (
+              <div className="space-y-2">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="btn-secondary w-full flex items-center justify-center text-sm py-2"
+                >
+                  Refresh Page (if scanning fails)
+                </button>
+                <button
+                  onClick={() => {
+                    // Try to request camera permission explicitly
+                    navigator.mediaDevices.getUserMedia({ video: true })
+                      .then(() => {
+                        toast.success('Camera permission granted! Try scanning again.');
+                      })
+                      .catch((error) => {
+                        toast.error('Camera permission denied. Please allow camera access in your browser settings.');
+                      });
+                  }}
+                  className="btn-secondary w-full flex items-center justify-center text-sm py-2"
+                >
+                  Request Camera Permission
+                </button>
+              </div>
+            )}
+              
+                </div>
+            
+          </div>
+
         </div>
       )}
 
       {isScanning && (
         <div className="card-glow">
-          <div className="relative">
-            <div id="qr-reader" ref={scannerElementRef} className="w-full"></div>
-          </div>
-          
-          <div className="mt-4 text-center">
-            <button
-              onClick={stopScanning}
-              className="btn-secondary"
-            >
-              Stop Scanning
-            </button>
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">QR Code Scanner</h3>
+              <button
+                onClick={stopScanning}
+                className="btn-secondary flex items-center"
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                Stop
+              </button>
+            </div>
+            
+            <div className="relative">
+              <video 
+                id="qr-reader" 
+                className="w-full max-w-md mx-auto rounded-lg"
+                style={{ 
+                  maxHeight: '400px',
+                  objectFit: 'cover',
+                  backgroundColor: '#000',
+                  transform: 'scaleX(-1)' // Mirror the video for better UX
+                }}
+                playsInline
+                webkit-playsinline="true"
+                x5-playsinline="true"
+                x5-video-player-type="h5"
+                x5-video-player-fullscreen="false"
+                muted
+                autoPlay
+                controls={false}
+              />
+            </div>
+            
+            <div className="mt-4 text-center">
+              <p className="text-gray-400 text-sm">
+                Point your camera at a QR code to scan it
+              </p>
+              <p className="text-gray-500 text-xs mt-1">
+                Make sure the QR code is well-lit and clearly visible
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -194,105 +386,82 @@ const VolunteerScanner: React.FC = () => {
       {showResult && participant && (
         <div className="card-glow">
           <div className="text-center mb-6">
-            {participant.isVerified ? (
-              <CheckCircle className="h-16 w-16 mx-auto mb-4 text-green-400" />
-            ) : (
-              <AlertCircle className="h-16 w-16 mx-auto mb-4 text-yellow-400" />
-            )}
-            
-            <h2 className="text-xl font-semibold text-white mb-2">
-              {participant.isVerified ? 'Already Verified' : 'Participant Found'}
-            </h2>
-            
-            <p className="text-gray-300">
-              {participant.isVerified 
-                ? 'This participant has already been verified.' 
-                : 'Review participant details and verify attendance.'
-              }
-            </p>
-          </div>
-
-          {/* Participant Details */}
-          <div className="bg-gray-800/50 p-4 rounded-lg mb-6">
-            <h3 className="font-semibold text-white mb-3">Participant Information</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Name:</span>
-                <span className="font-medium text-white">{participant.fullName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Email:</span>
-                <span className="font-medium text-white">{participant.email}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Phone:</span>
-                <span className="font-medium text-white">{participant.phone}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Registration Date:</span>
-                <span className="font-medium text-white">
-                  {new Date(participant.registrationDate).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Payment Status:</span>
-                <span className={`px-2 py-1 rounded-full text-xs ${
-                  participant.paymentStatus === 'paid' 
-                    ? 'bg-green-500/20 text-green-400' 
-                    : participant.paymentStatus === 'offline_paid'
-                    ? 'bg-blue-500/20 text-blue-400'
-                    : 'bg-yellow-500/20 text-yellow-400'
-                }`}>
-                  {participant.paymentStatus === 'paid' ? 'Paid' :
-                   participant.paymentStatus === 'offline_paid' ? 'Offline Paid' : 'Pending'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Verification Status:</span>
-                <span className={`px-2 py-1 rounded-full text-xs ${
-                  participant.isVerified 
-                    ? 'bg-green-500/20 text-green-400' 
-                    : 'bg-yellow-500/20 text-yellow-400'
-                }`}>
-                  {participant.isVerified ? 'Verified' : 'Pending'}
-                </span>
-              </div>
+            <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+              participant.isVerified 
+                ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+            }`}>
+              {participant.isVerified ? (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Verified
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Pending Verification
+                </>
+              )}
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="space-y-3">
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-gray-400">Participant Name</label>
+              <p className="text-lg font-semibold text-white">{participant.fullName}</p>
+            </div>
+            
+            <div>
+              <label className="text-sm text-gray-400">Email</label>
+              <p className="text-white">{participant.email}</p>
+            </div>
+            
+            <div>
+              <label className="text-sm text-gray-400">Phone</label>
+              <p className="text-white">{participant.phone}</p>
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-400">College</label>
+              <p className="text-white">{participant.college}</p>
+            </div>
+
+            {participant.teamName && (
+              <div>
+                <label className="text-sm text-gray-400">Team</label>
+                <p className="text-white">
+                  {participant.teamName} 
+                  {participant.isTeamLead && <span className="text-cyan-400 ml-2">(Team Lead)</span>}
+                </p>
+              </div>
+            )}
+            
+            <div>
+              <label className="text-sm text-gray-400">Registration Date</label>
+              <p className="text-white">{new Date(participant.registrationDate).toLocaleDateString()}</p>
+            </div>
+          </div>
+
+          <div className="flex space-x-3 mt-6">
+            <button
+              onClick={resetScanner}
+              className="flex-1 btn-secondary"
+            >
+              Scan Another
+            </button>
+            
             {!participant.isVerified && (
               <button
                 onClick={handleVerify}
                 disabled={verifying}
-                className="btn-primary w-full flex items-center justify-center"
+                className="flex-1 btn-primary disabled:opacity-50"
               >
-                <CheckCircle className="h-4 w-4 mr-2" />
                 {verifying ? 'Verifying...' : 'Verify Participant'}
               </button>
             )}
-            
-            <button
-              onClick={resetScanner}
-              className="btn-secondary w-full"
-            >
-              Scan Another QR Code
-            </button>
           </div>
         </div>
       )}
-
-      {/* Instructions */}
-      <div className="mt-6 p-4 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
-        <h4 className="font-semibold text-cyan-400 mb-2">Scanner Instructions:</h4>
-        <ul className="text-sm text-gray-300 space-y-1">
-          <li>• Allow camera access when prompted</li>
-          <li>• Position the QR code within the scanning area</li>
-          <li>• Ensure good lighting for better scanning</li>
-          <li>• Verify participant details before confirming</li>
-        </ul>
-      </div>
     </div>
   );
 };

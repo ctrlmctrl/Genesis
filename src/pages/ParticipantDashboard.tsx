@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Calendar, MapPin, Clock, QrCode, LogOut, User } from 'lucide-react';
 import { Event, Participant } from '../types';
 import { dataService } from '../services/dataService';
+import { realtimeService } from '../services/realtimeService';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -15,28 +16,60 @@ const ParticipantDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [eventsData, participantsData] = await Promise.all([
-          dataService.getEvents(),
-          dataService.getParticipants()
-        ]);
-        
+    if (!user) return;
+
+    let unsubscribeEvents: (() => void) | null = null;
+    let unsubscribeParticipants: (() => void) | null = null;
+
+    const setupRealtimeListeners = () => {
+      // Listen to events in real-time
+      unsubscribeEvents = realtimeService.listenToEvents((eventsData) => {
         setEvents(eventsData);
-        // Filter participants for current user
-        const userParticipants = participantsData.filter((p: Participant) => p.email === user?.email);
-        setParticipants(userParticipants);
-      } catch (error) {
-        console.error('Error loading data:', error);
-        toast.error('Failed to load data');
-      } finally {
         setLoading(false);
+      });
+
+      // Listen to user's participants in real-time
+      if (user.email) {
+        unsubscribeParticipants = realtimeService.listenToUserParticipants(user.email, (participantsData) => {
+          setParticipants(participantsData);
+        });
       }
     };
 
-    if (user) {
+    // Check if we're using Firebase (production) or localStorage (development)
+    const isFirebase = process.env.REACT_APP_STORAGE_MODE === 'firebase' || 
+                      (process.env.NODE_ENV === 'production' && !process.env.REACT_APP_STORAGE_MODE);
+
+    if (isFirebase) {
+      setupRealtimeListeners();
+    } else {
+      // Fallback to regular data loading for development
+      const loadData = async () => {
+        try {
+          const [eventsData, participantsData] = await Promise.all([
+            dataService.getEvents(),
+            dataService.getParticipants()
+          ]);
+          
+          setEvents(eventsData);
+          // Filter participants for current user
+          const userParticipants = participantsData.filter((p: Participant) => p.email === user?.email);
+          setParticipants(userParticipants);
+        } catch (error) {
+          console.error('Error loading data:', error);
+          toast.error('Failed to load data');
+        } finally {
+          setLoading(false);
+        }
+      };
       loadData();
     }
+
+    // Cleanup function
+    return () => {
+      if (unsubscribeEvents) unsubscribeEvents();
+      if (unsubscribeParticipants) unsubscribeParticipants();
+    };
   }, [user]);
 
   const handleLogout = () => {
@@ -93,16 +126,15 @@ const ParticipantDashboard: React.FC = () => {
         {participants.length === 0 ? (
           <div className="card-glow text-center py-8">
             <User className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-400 mb-4">You haven't registered for any events yet.</p>
+            <p className="text-gray-400 mb-4">No event registrations found.</p>
             <Link to="/" className="btn-primary">
-              Browse Events
+              View Events
             </Link>
           </div>
         ) : (
           <div className="space-y-4">
             {participants.map((participant) => {
               const event = events.find(e => e.id === participant.eventId);
-              if (!event) return null;
 
               return (
                 <motion.div
@@ -112,7 +144,9 @@ const ParticipantDashboard: React.FC = () => {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="text-lg font-semibold text-white">{event.title}</h3>
+                      <h3 className="text-lg font-semibold text-white">
+                        {event ? event.title : `Event ID: ${participant.eventId}`}
+                      </h3>
                       {participant.teamName && (
                         <div className="mt-1">
                           <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full mr-2">
@@ -137,17 +171,29 @@ const ParticipantDashboard: React.FC = () => {
                   </div>
 
                   <div className="space-y-2 mb-4">
+                    {event ? (
+                      <>
+                        <div className="flex items-center text-sm text-gray-400">
+                          <Calendar className="h-4 w-4 mr-3 text-cyan-400" />
+                          {new Date(event.date).toLocaleDateString()}
+                        </div>
+                        <div className="flex items-center text-sm text-gray-400">
+                          <Clock className="h-4 w-4 mr-3 text-cyan-400" />
+                          {event.time}
+                        </div>
+                        <div className="flex items-center text-sm text-gray-400">
+                          <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
+                          {event.location}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center text-sm text-gray-400">
+                        <Calendar className="h-4 w-4 mr-3" />
+                        Event information unavailable
+                      </div>
+                    )}
                     <div className="flex items-center text-sm text-gray-400">
-                      <Calendar className="h-4 w-4 mr-3 text-cyan-400" />
-                      {new Date(event.date).toLocaleDateString()}
-                    </div>
-                    <div className="flex items-center text-sm text-gray-400">
-                      <Clock className="h-4 w-4 mr-3 text-cyan-400" />
-                      {event.time}
-                    </div>
-                    <div className="flex items-center text-sm text-gray-400">
-                      <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
-                      {event.location}
+                      <span>Registration Date: {new Date(participant.registrationDate).toLocaleDateString()}</span>
                     </div>
                   </div>
 
@@ -168,14 +214,28 @@ const ParticipantDashboard: React.FC = () => {
       {/* Available Events */}
       <div>
         <h2 className="text-xl font-bold text-white mb-4 neon-text">Available Events</h2>
-        {events.length === 0 ? (
-          <div className="card-glow text-center py-8">
-            <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-400">No events available at the moment.</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {events.slice(0, 3).map((event) => (
+        {(() => {
+          // Filter out events that user is already registered for
+          const registeredEventIds = participants.map(p => p.eventId);
+          const availableEvents = events.filter(event => !registeredEventIds.includes(event.id));
+          
+          if (availableEvents.length === 0) {
+            return (
+              <div className="card-glow text-center py-8">
+                <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-400">
+                  {events.length === 0 
+                    ? "No events available at the moment." 
+                    : "You're registered for all available events!"
+                  }
+                </p>
+              </div>
+            );
+          }
+          
+          return (
+            <div className="space-y-4">
+              {availableEvents.slice(0, 3).map((event) => (
               <motion.div
                 key={event.id}
                 className="card-glow hover:shadow-cyan-500/50 transition-shadow"
@@ -184,7 +244,10 @@ const ParticipantDashboard: React.FC = () => {
                 <div className="flex items-start justify-between mb-3">
                   <h3 className="text-lg font-semibold text-white">{event.title}</h3>
                   <span className="text-sm text-gray-400">
-                    {event.currentParticipants}{event.maxParticipants ? `/${event.maxParticipants}` : ''} participants
+                    {event.isTeamEvent 
+                      ? `${Math.ceil(event.currentParticipants / (event.teamSize || 1))} teams (${event.currentParticipants} members)${event.maxTeams ? ` / ${event.maxTeams} max teams` : ''}`
+                      : `${event.currentParticipants} participants`
+                    }
                   </span>
                 </div>
 
@@ -212,9 +275,10 @@ const ParticipantDashboard: React.FC = () => {
                   Register Now
                 </Link>
               </motion.div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

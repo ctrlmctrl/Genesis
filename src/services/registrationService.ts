@@ -11,7 +11,7 @@ export interface RegistrationStatus {
 }
 
 /**
- * Check if registration is currently open for an event
+ * Check if regular registration is currently open for an event
  */
 export const isRegistrationOpen = (event: Event): boolean => {
   if (!event.registrationStartDate || !event.registrationEndDate) {
@@ -24,6 +24,68 @@ export const isRegistrationOpen = (event: Event): boolean => {
   const endDateTime = new Date(`${event.registrationEndDate}T${event.registrationEndTime || '23:59'}`);
   
   return now >= startDateTime && now <= endDateTime;
+};
+
+/**
+ * Check if on-the-spot registration is available (event is being held during event hours)
+ */
+export const isOnSpotRegistrationAvailable = (event: Event): boolean => {
+  if (!event.allowOnSpotRegistration) {
+    return false;
+  }
+  
+  const now = new Date();
+  const eventDate = new Date(event.date);
+  
+  // Check if event is happening today
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  eventDate.setHours(0, 0, 0, 0);
+  
+  if (today.getTime() !== eventDate.getTime()) {
+    return false; // Not event day
+  }
+  
+  // Check if we're within on-the-spot registration hours
+  if (event.onSpotStartTime && event.onSpotEndTime) {
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+    const startTime = parseInt(event.onSpotStartTime.split(':')[0]) * 60 + parseInt(event.onSpotStartTime.split(':')[1]);
+    const endTime = parseInt(event.onSpotEndTime.split(':')[0]) * 60 + parseInt(event.onSpotEndTime.split(':')[1]);
+    
+    return currentTime >= startTime && currentTime <= endTime;
+  }
+  
+  // If no specific hours set, allow all day on event date
+  return true;
+};
+
+/**
+ * Check if registration is closed for a specific date
+ */
+export const isRegistrationClosedForDate = (event: Event, date: string): boolean => {
+  if (!event.dailyRegistrationClosure) {
+    return false;
+  }
+  
+  return event.dailyRegistrationClosure[date] === true;
+};
+
+/**
+ * Check if regular registration is available (considering daily closures)
+ */
+export const isRegularRegistrationAvailable = (event: Event): boolean => {
+  // Check if registration is open based on dates
+  if (!isRegistrationOpen(event)) {
+    return false;
+  }
+  
+  // Check if registration is closed for today
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+  if (isRegistrationClosedForDate(event, today)) {
+    return false;
+  }
+  
+  return true;
 };
 
 /**
@@ -53,46 +115,44 @@ export const canUserRegister = (event: Event, userEmail?: string): RegistrationS
     };
   }
   
-  // Check participant limits
-  if (event.maxParticipants && event.currentParticipants >= event.maxParticipants) {
-    // Volunteers can register offline participants even when full
-    if (permissions.canRegisterOffline) {
-      return { canRegister: true };
-    }
-    
-    return {
-      canRegister: false,
-      reason: 'Event is full. No more registrations accepted.'
+  // Check if regular registration is available (considering daily closures)
+  if (isRegularRegistrationAvailable(event)) {
+    return { canRegister: true };
+  }
+  
+  // Check if on-the-spot registration is available
+  if (isOnSpotRegistrationAvailable(event)) {
+    return { 
+      canRegister: true,
+      reason: 'On-the-spot registration available'
     };
   }
   
-  // Check registration deadline
-  if (!isRegistrationOpen(event)) {
-    const now = new Date();
-    const startDateTime = event.registrationStartDate ? 
-      new Date(`${event.registrationStartDate}T${event.registrationStartTime || '00:00'}`) : null;
-    const endDateTime = event.registrationEndDate ? 
-      new Date(`${event.registrationEndDate}T${event.registrationEndTime || '23:59'}`) : null;
-    
-    if (startDateTime && now < startDateTime) {
-      return {
-        canRegister: false,
-        reason: 'Registration has not started yet',
-        timeRemaining: getTimeUntil(startDateTime)
-      };
-    }
-    
-    if (endDateTime && now > endDateTime) {
-      // Volunteers can still register offline participants after deadline
-      if (permissions.canRegisterOffline) {
-        return { canRegister: true };
-      }
-      
-      return {
-        canRegister: false,
-        reason: 'Registration deadline has passed'
-      };
-    }
+  // Check if volunteers can register offline participants after deadline
+  if (permissions.canRegisterOffline) {
+    return { canRegister: true };
+  }
+  
+  // Regular registration is closed and no on-the-spot available
+  const now = new Date();
+  const startDateTime = event.registrationStartDate ? 
+    new Date(`${event.registrationStartDate}T${event.registrationStartTime || '00:00'}`) : null;
+  const endDateTime = event.registrationEndDate ? 
+    new Date(`${event.registrationEndDate}T${event.registrationEndTime || '23:59'}`) : null;
+  
+  if (startDateTime && now < startDateTime) {
+    return {
+      canRegister: false,
+      reason: 'Registration has not started yet',
+      timeRemaining: getTimeUntil(startDateTime)
+    };
+  }
+  
+  if (endDateTime && now > endDateTime) {
+    return {
+      canRegister: false,
+      reason: 'Registration deadline has passed'
+    };
   }
   
   return { canRegister: true };
@@ -131,6 +191,22 @@ export const getRegistrationStatusMessage = (event: Event, userEmail?: string): 
     
     if (userRole === 'admin' || userRole === 'volunteer') {
       return 'You can register participants (staff access)';
+    }
+    
+    // Check if it's on-the-spot registration
+    if (isOnSpotRegistrationAvailable(event)) {
+      return 'On-the-spot registration available';
+    }
+    
+    // Check if regular registration is available
+    if (isRegularRegistrationAvailable(event)) {
+      return 'Registration is open';
+    }
+    
+    // Check if registration is closed for today
+    const today = new Date().toISOString().split('T')[0];
+    if (isRegistrationClosedForDate(event, today)) {
+      return 'Registration closed for today';
     }
     
     if (!isRegistrationOpen(event)) {
@@ -182,7 +258,7 @@ export const validateRegistrationDates = (
  * Get registration countdown for display
  */
 export const getRegistrationCountdown = (event: Event): {
-  status: 'not-started' | 'open' | 'closed';
+  status: 'not-started' | 'open' | 'closed' | 'on_spot';
   message: string;
   timeRemaining?: string;
 } => {
@@ -206,6 +282,14 @@ export const getRegistrationCountdown = (event: Event): {
   }
   
   if (now > endDateTime) {
+    // Check if on-the-spot registration is available
+    if (isOnSpotRegistrationAvailable(event)) {
+      return {
+        status: 'on_spot',
+        message: 'On-the-spot registration available'
+      };
+    }
+    
     return {
       status: 'closed',
       message: 'Registration closed'
@@ -218,3 +302,55 @@ export const getRegistrationCountdown = (event: Event): {
     timeRemaining: getTimeUntil(endDateTime)
   };
 };
+
+/**
+ * Get the appropriate entry fee for registration type
+ */
+export const getEntryFee = (event: Event, registrationType: 'regular' | 'on_spot' = 'regular'): number => {
+  if (registrationType === 'on_spot' && event.onSpotEntryFee !== undefined) {
+    return event.onSpotEntryFee;
+  }
+  return event.entryFee;
+};
+
+/**
+ * Get the appropriate payment method for registration type
+ */
+export const getPaymentMethod = (event: Event, registrationType: 'regular' | 'on_spot' = 'regular'): 'online' | 'offline' | 'both' => {
+  if (registrationType === 'on_spot' && event.onSpotPaymentMethod) {
+    return event.onSpotPaymentMethod;
+  }
+  return event.paymentMethod;
+};
+
+/**
+ * Determine the registration type based on event status
+ */
+export const getRegistrationType = (event: Event): 'regular' | 'on_spot' => {
+  if (isRegularRegistrationAvailable(event)) {
+    return 'regular';
+  }
+  
+  if (isOnSpotRegistrationAvailable(event)) {
+    return 'on_spot';
+  }
+  
+  return 'regular'; // Default fallback
+};
+
+/**
+ * Toggle registration closure for a specific date
+ */
+export const toggleRegistrationClosureForDate = (event: Event, date: string): Event => {
+  const updatedEvent = { ...event };
+  
+  if (!updatedEvent.dailyRegistrationClosure) {
+    updatedEvent.dailyRegistrationClosure = {};
+  }
+  
+  updatedEvent.dailyRegistrationClosure[date] = !updatedEvent.dailyRegistrationClosure[date];
+  updatedEvent.updatedAt = new Date().toISOString();
+  
+  return updatedEvent;
+};
+

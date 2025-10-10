@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, LogIn, Shield, Users } from 'lucide-react';
+import { LogIn, Shield, Users } from 'lucide-react';
 import { roleAuthService, RoleUser } from '../services/roleAuth';
 import toast from 'react-hot-toast';
 
@@ -10,26 +10,24 @@ interface RoleLoginProps {
 }
 
 const RoleLogin: React.FC<RoleLoginProps> = ({ onLogin, role }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [userId, setUserId] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!username.trim() || !password.trim()) {
-      toast.error('Please enter both username and password');
+    if (!userId.trim()) {
+      toast.error('Please enter your User ID');
       return;
     }
 
     setLoading(true);
     try {
-      const user = await roleAuthService.login(username, password);
+      const user = await roleAuthService.login(userId);
       
       // Check if the logged-in user has the correct role
       if (user.role !== role) {
-        toast.error(`Invalid credentials for ${role} access`);
+        toast.error(`Invalid User ID for ${role} access`);
         roleAuthService.logout();
         return;
       }
@@ -37,7 +35,7 @@ const RoleLogin: React.FC<RoleLoginProps> = ({ onLogin, role }) => {
       toast.success(`Welcome, ${user.name}!`);
       onLogin(user);
     } catch (error) {
-      toast.error('Invalid username or password');
+      toast.error('Invalid User ID');
     } finally {
       setLoading(false);
     }
@@ -49,14 +47,14 @@ const RoleLogin: React.FC<RoleLoginProps> = ({ onLogin, role }) => {
       icon: Users,
       color: 'text-cyan-400',
       description: 'Access volunteer dashboard and QR scanner',
-      credentials: 'Username: volunteer, Password: volunteer123'
+      credentials: 'User ID: volunteer'
     },
     admin: {
       title: 'Admin Login',
       icon: Shield,
       color: 'text-blue-400',
       description: 'Access admin dashboard and event management',
-      credentials: 'Username: admin, Password: admin123'
+      credentials: 'User ID: admin'
     }
   };
 
@@ -84,43 +82,18 @@ const RoleLogin: React.FC<RoleLoginProps> = ({ onLogin, role }) => {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-2">
-            Username
+          <label htmlFor="userId" className="block text-sm font-medium text-gray-300 mb-2">
+            User ID
           </label>
           <input
             type="text"
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            id="userId"
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
             className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-            placeholder="Enter username"
+            placeholder="Enter your User ID"
             disabled={loading}
           />
-        </div>
-
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
-            Password
-          </label>
-          <div className="relative">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent pr-12"
-              placeholder="Enter password"
-              disabled={loading}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
-              disabled={loading}
-            >
-              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-            </button>
-          </div>
         </div>
 
         <motion.button
@@ -144,12 +117,6 @@ const RoleLogin: React.FC<RoleLoginProps> = ({ onLogin, role }) => {
         </motion.button>
       </form>
 
-      <div className="mt-6 p-4 bg-gray-800/50 rounded-lg">
-        <p className="text-xs text-gray-400 text-center">
-          <strong>Demo Credentials:</strong><br />
-          {info.credentials}
-        </p>
-      </div>
     </motion.div>
   );
 };

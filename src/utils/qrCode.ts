@@ -19,7 +19,7 @@ export const generateQRCode = async (data: string): Promise<string> => {
 
 export const parseQRCodeData = (qrData: string): { eventId: string; participantId: string; email: string } | null => {
   try {
-    // Expected format: EVENT:eventId:participantId:email:timestamp
+    // Legacy format: EVENT:eventId:participantId:email:timestamp
     const parts = qrData.split(':');
     if (parts.length >= 5 && parts[0] === 'EVENT') {
       return {
@@ -32,5 +32,15 @@ export const parseQRCodeData = (qrData: string): { eventId: string; participantI
   } catch (error) {
     console.error('Error parsing QR code data:', error);
     return null;
+  }
+};
+
+// New function to validate unique QR codes
+export const isValidUniqueQRCode = (qrData: string): boolean => {
+  try {
+    const parts = qrData.split(':');
+    return parts.length === 3 && parts[0] === 'GENESIS' && parts[1] === '1.0';
+  } catch (error) {
+    return false;
   }
 };

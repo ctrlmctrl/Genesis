@@ -14,7 +14,7 @@
  */
 export const ADMIN_CREDENTIALS = {
   emails: [
-    'admin@yourdomain.com',           // Replace with your admin email
+    'ctrlmctrl@gmail.com',           // Replace with your admin email
     'organizer@yourdomain.com',       // Replace with organizer email
     'manager@yourdomain.com'          // Add more admin emails as needed
   ]

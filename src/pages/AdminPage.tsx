@@ -12,20 +12,24 @@ import {
   Edit,
   Trash2,
   DollarSign,
-  User
+  User,
+  Shield
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Event } from '../types';
 import { dataService } from '../services/dataService';
 import { excelService } from '../services/excelService';
 import { eventLeadExportService } from '../services/eventLeadExportService';
+import { realtimeService } from '../services/realtimeService';
 import { roleAuthService, RoleUser } from '../services/roleAuth';
-import RoleLogin from '../components/RoleLogin';
+import { testFirebaseConnection } from '../utils/firebaseTest';
 import OfflineRegistration from '../components/OfflineRegistration';
 
 const AdminPage: React.FC = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<RoleUser | null>(null);
+  const [adminUser, setAdminUser] = useState<RoleUser | null>(null);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [loginForm, setLoginForm] = useState({ userId: '' });
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -38,25 +42,60 @@ const AdminPage: React.FC = () => {
     time: '',
     location: '',
     entryFee: 0,
-    maxParticipants: 0,
+    maxTeams: 0,
     paymentMethod: 'both' as 'online' | 'offline' | 'both',
     upiId: '',
     isTeamEvent: false,
     teamSize: 1,
+    // On-the-spot registration fields
+    allowOnSpotRegistration: false,
+    onSpotEntryFee: 0,
+    onSpotPaymentMethod: 'both' as 'online' | 'offline' | 'both',
+    onSpotStartTime: '08:00',
+    onSpotEndTime: '10:00',
   });
   const [showOfflineRegistration, setShowOfflineRegistration] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   useEffect(() => {
-    // Check if user is already logged in
-    const currentUser = roleAuthService.getCurrentUser();
-    if (currentUser && currentUser.role === 'admin') {
-      setUser(currentUser);
-      loadEvents();
+    // Check if admin is already logged in
+    const savedAdmin = roleAuthService.getCurrentUser();
+    if (savedAdmin && savedAdmin.role === 'admin') {
+      setAdminUser(savedAdmin);
+      setIsAdminAuthenticated(true);
+      setupEventListeners();
     } else {
       setLoading(false);
     }
   }, []);
+
+  const setupEventListeners = () => {
+    // Check if we're using Firebase (production) or localStorage (development)
+    const isFirebase = process.env.REACT_APP_STORAGE_MODE === 'firebase' || 
+                      (process.env.NODE_ENV === 'production' && !process.env.REACT_APP_STORAGE_MODE);
+
+    if (isFirebase) {
+      // Use real-time listener for Firebase
+      const unsubscribe = realtimeService.listenToEvents((eventsData) => {
+        setEvents(eventsData);
+        setLoading(false);
+      });
+
+      // Test Firebase connection
+      testFirebaseConnection().then((isConnected) => {
+        if (isConnected) {
+          toast.success('Firebase connected successfully!');
+        } else {
+          toast.error('Firebase connection failed. Check console for details.');
+        }
+      });
+
+      return unsubscribe;
+    } else {
+      // Fallback to regular data loading for development
+      loadEvents();
+    }
+  };
 
   const loadEvents = async () => {
     try {
@@ -88,16 +127,20 @@ const AdminPage: React.FC = () => {
         time: '',
         location: '',
         entryFee: 0,
-        maxParticipants: 0,
+        maxTeams: 0,
         paymentMethod: 'both',
         upiId: '',
         isTeamEvent: false,
         teamSize: 1,
+        // On-the-spot registration fields
+        allowOnSpotRegistration: false,
+        onSpotEntryFee: 0,
+        onSpotPaymentMethod: 'both',
+        onSpotStartTime: '08:00',
+        onSpotEndTime: '10:00',
       });
       
-      // Reload events
-      const eventsData = await dataService.getEvents();
-      setEvents(eventsData);
+      // Events will be updated automatically via real-time listener
     } catch (error) {
       console.error('Error creating event:', error);
       toast.error('Failed to create event');
@@ -113,11 +156,17 @@ const AdminPage: React.FC = () => {
       time: event.time,
       location: event.location,
       entryFee: event.entryFee,
-      maxParticipants: event.maxParticipants || 0,
+      maxTeams: event.maxTeams || 0,
       paymentMethod: event.paymentMethod,
       upiId: event.upiId || '',
       isTeamEvent: event.isTeamEvent,
       teamSize: event.teamSize || 1,
+      // On-the-spot registration fields
+      allowOnSpotRegistration: event.allowOnSpotRegistration || false,
+      onSpotEntryFee: event.onSpotEntryFee || 0,
+      onSpotPaymentMethod: event.onSpotPaymentMethod || 'both',
+      onSpotStartTime: event.onSpotStartTime || '08:00',
+      onSpotEndTime: event.onSpotEndTime || '10:00',
     });
     setShowEditForm(true);
   };
@@ -143,19 +192,38 @@ const AdminPage: React.FC = () => {
         time: '',
         location: '',
         entryFee: 0,
-        maxParticipants: 0,
+        maxTeams: 0,
         paymentMethod: 'both',
         upiId: '',
         isTeamEvent: false,
         teamSize: 1,
+        // On-the-spot registration fields
+        allowOnSpotRegistration: false,
+        onSpotEntryFee: 0,
+        onSpotPaymentMethod: 'both',
+        onSpotStartTime: '08:00',
+        onSpotEndTime: '10:00',
       });
       
-      // Reload events
-      const eventsData = await dataService.getEvents();
-      setEvents(eventsData);
+      // Events will be updated automatically via real-time listener
     } catch (error) {
       console.error('Error updating event:', error);
       toast.error('Failed to update event');
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: string, eventTitle: string) => {
+    if (!window.confirm(`Are you sure you want to delete "${eventTitle}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await dataService.deleteEvent(eventId);
+      toast.success('Event deleted successfully!');
+      loadEvents();
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      toast.error('Failed to delete event');
     }
   };
 
@@ -210,14 +278,68 @@ const AdminPage: React.FC = () => {
     loadEvents();
   };
 
-  const handleLogin = (loggedInUser: RoleUser) => {
-    setUser(loggedInUser);
-    loadEvents();
+  const handleToggleDailyClosure = async (event: Event, date: string) => {
+    try {
+      const updatedEvent = {
+        ...event,
+        dailyRegistrationClosure: {
+          ...event.dailyRegistrationClosure,
+          [date]: !event.dailyRegistrationClosure?.[date]
+        },
+        updatedAt: new Date().toISOString()
+      };
+      
+      await dataService.updateEvent(event.id, updatedEvent);
+      
+      const status = updatedEvent.dailyRegistrationClosure?.[date] ? 'closed' : 'opened';
+      toast.success(`Registration ${status} for ${date}`);
+    } catch (error) {
+      console.error('Error toggling daily closure:', error);
+      toast.error('Failed to update registration closure');
+    }
+  };
+
+  const handleUpdateOnSpotPricing = async (event: Event, newPrice: number) => {
+    try {
+      const updatedEvent = {
+        ...event,
+        onSpotEntryFee: newPrice,
+        updatedAt: new Date().toISOString()
+      };
+      
+      await dataService.updateEvent(event.id, updatedEvent);
+      toast.success(`On-the-spot pricing updated to ₹${newPrice}`);
+    } catch (error) {
+      console.error('Error updating on-the-spot pricing:', error);
+      toast.error('Failed to update on-the-spot pricing');
+    }
+  };
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const user = await roleAuthService.login(loginForm.userId);
+      
+      // Check if user has admin role
+      if (user.role !== 'admin') {
+        toast.error('Access denied. Admin privileges required.');
+        return;
+      }
+      
+      setAdminUser(user);
+      setIsAdminAuthenticated(true);
+      toast.success(`Welcome, ${user.username}!`);
+      loadEvents();
+    } catch (error) {
+      console.error('Admin login error:', error);
+      toast.error('Invalid admin User ID');
+    }
   };
 
   const handleLogout = () => {
     roleAuthService.logout();
-    setUser(null);
+    setAdminUser(null);
+    setIsAdminAuthenticated(false);
     toast.success('Logged out successfully');
     navigate('/');
   };
@@ -239,10 +361,32 @@ const AdminPage: React.FC = () => {
     );
   }
 
-  if (!user) {
+  if (!isAdminAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <RoleLogin onLogin={handleLogin} role="admin" />
+        <div className="card-glow p-8 max-w-md w-full">
+          <h1 className="text-2xl font-bold text-white mb-6 text-center neon-text">Admin Login</h1>
+          <form onSubmit={handleAdminLogin} className="space-y-4">
+            <div>
+              <label className="block text-gray-300 mb-2">User ID</label>
+              <input
+                type="text"
+                value={loginForm.userId}
+                onChange={(e) => setLoginForm({ ...loginForm, userId: e.target.value })}
+                className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                placeholder="Enter admin User ID"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="btn-primary w-full flex items-center justify-center"
+            >
+              <Shield className="h-5 w-5 mr-2" />
+              Login as Admin
+            </button>
+          </form>
+        </div>
       </div>
     );
   }
@@ -253,10 +397,10 @@ const AdminPage: React.FC = () => {
       <div className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
-              <span className="ml-4 text-gray-400">Welcome, {user.name}</span>
-            </div>
+                <div className="flex items-center">
+                  <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+                  <span className="ml-4 text-gray-400">Welcome, {adminUser?.username || 'Admin'}</span>
+                </div>
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleExportAll}
@@ -449,14 +593,14 @@ const AdminPage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Max Participants (0 = unlimited)
+                  Max Teams (0 = unlimited)
                 </label>
                 <input
                   type="number"
-                  value={newEvent.maxParticipants}
-                  onChange={(e) => setNewEvent({ ...newEvent, maxParticipants: parseInt(e.target.value) || 0 })}
+                  value={newEvent.maxTeams}
+                  onChange={(e) => setNewEvent({ ...newEvent, maxTeams: parseInt(e.target.value) || 0 })}
                   className="input-field"
-                  placeholder="Enter max participants (0 for unlimited)"
+                  placeholder="Enter max teams"
                   min="0"
                 />
               </div>
@@ -488,6 +632,85 @@ const AdminPage: React.FC = () => {
                   placeholder="yourname@upi"
                 />
               </div>
+
+              {/* On-the-spot Registration Section */}
+              <div className="md:col-span-2">
+                <h4 className="text-lg font-semibold text-white mb-4 border-b border-gray-600 pb-2">
+                  On-the-Spot Registration
+                </h4>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={newEvent.allowOnSpotRegistration}
+                    onChange={(e) => setNewEvent({ ...newEvent, allowOnSpotRegistration: e.target.checked })}
+                    className="w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-cyan-500 focus:ring-2"
+                  />
+                  <span className="text-sm font-medium text-gray-300">
+                    Allow on-the-spot registration (when event is being held)
+                  </span>
+                </label>
+              </div>
+
+              {newEvent.allowOnSpotRegistration && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      On-the-Spot Entry Fee (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={newEvent.onSpotEntryFee}
+                      onChange={(e) => setNewEvent({ ...newEvent, onSpotEntryFee: parseFloat(e.target.value) || 0 })}
+                      className="input-field"
+                      min="0"
+                      step="0.01"
+                      placeholder="Enter on-the-spot fee"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      On-the-Spot Payment Method
+                    </label>
+                    <select
+                      value={newEvent.onSpotPaymentMethod}
+                      onChange={(e) => setNewEvent({ ...newEvent, onSpotPaymentMethod: e.target.value as 'online' | 'offline' | 'both' })}
+                      className="input-field"
+                    >
+                      <option value="both">Both Online & Offline</option>
+                      <option value="online">Online Only</option>
+                      <option value="offline">Offline Only</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      On-the-Spot Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={newEvent.onSpotStartTime}
+                      onChange={(e) => setNewEvent({ ...newEvent, onSpotStartTime: e.target.value })}
+                      className="input-field"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      On-the-Spot End Time
+                    </label>
+                    <input
+                      type="time"
+                      value={newEvent.onSpotEndTime}
+                      onChange={(e) => setNewEvent({ ...newEvent, onSpotEndTime: e.target.value })}
+                      className="input-field"
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="md:col-span-2 flex space-x-4">
                 <button
@@ -586,11 +809,11 @@ const AdminPage: React.FC = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Max Participants</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Max Teams</label>
                 <input
                   type="number"
-                  value={newEvent.maxParticipants}
-                  onChange={(e) => setNewEvent({ ...newEvent, maxParticipants: Number(e.target.value) })}
+                  value={newEvent.maxTeams}
+                  onChange={(e) => setNewEvent({ ...newEvent, maxTeams: Number(e.target.value) })}
                   className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                   min="1"
                 />
@@ -619,6 +842,85 @@ const AdminPage: React.FC = () => {
                   placeholder="example@upi"
                 />
               </div>
+
+              {/* On-the-spot Registration Section */}
+              <div className="md:col-span-2">
+                <h4 className="text-lg font-semibold text-white mb-4 border-b border-gray-600 pb-2">
+                  On-the-Spot Registration
+                </h4>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={newEvent.allowOnSpotRegistration}
+                    onChange={(e) => setNewEvent({ ...newEvent, allowOnSpotRegistration: e.target.checked })}
+                    className="w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-cyan-500 focus:ring-2"
+                  />
+                  <span className="text-sm font-medium text-gray-300">
+                    Allow on-the-spot registration (when event is being held)
+                  </span>
+                </label>
+              </div>
+
+              {newEvent.allowOnSpotRegistration && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      On-the-Spot Entry Fee (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={newEvent.onSpotEntryFee}
+                      onChange={(e) => setNewEvent({ ...newEvent, onSpotEntryFee: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      min="0"
+                      step="0.01"
+                      placeholder="Enter on-the-spot fee"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      On-the-Spot Payment Method
+                    </label>
+                    <select
+                      value={newEvent.onSpotPaymentMethod}
+                      onChange={(e) => setNewEvent({ ...newEvent, onSpotPaymentMethod: e.target.value as 'online' | 'offline' | 'both' })}
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    >
+                      <option value="both">Both Online & Offline</option>
+                      <option value="online">Online Only</option>
+                      <option value="offline">Offline Only</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      On-the-Spot Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={newEvent.onSpotStartTime}
+                      onChange={(e) => setNewEvent({ ...newEvent, onSpotStartTime: e.target.value })}
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      On-the-Spot End Time
+                    </label>
+                    <input
+                      type="time"
+                      value={newEvent.onSpotEndTime}
+                      onChange={(e) => setNewEvent({ ...newEvent, onSpotEndTime: e.target.value })}
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    />
+                  </div>
+                </>
+              )}
               
               <div className="md:col-span-2">
                 <div className="flex items-center space-x-4">
@@ -722,6 +1024,13 @@ const AdminPage: React.FC = () => {
                     
                     <div className="flex items-center space-x-2">
                       <Link
+                        to={`/event/${event.id}/participants`}
+                        className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
+                        title="View Participants"
+                      >
+                        <Users className="h-4 w-4 text-cyan-400" />
+                      </Link>
+                      <Link
                         to={`/admin/events/${event.id}`}
                         className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
                         title="View Details"
@@ -759,7 +1068,8 @@ const AdminPage: React.FC = () => {
                         <Edit className="h-4 w-4 text-gray-400" />
                       </button>
                       <button
-                        className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
+                        onClick={() => handleDeleteEvent(event.id, event.title)}
+                        className="p-2 hover:bg-red-600 rounded-lg transition-colors"
                         title="Delete Event"
                       >
                         <Trash2 className="h-4 w-4 text-red-400" />
@@ -770,6 +1080,113 @@ const AdminPage: React.FC = () => {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Daily Registration Closure Management */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-semibold text-white mb-6">Daily Registration Closure</h2>
+          <div className="bg-gray-800 rounded-xl p-6">
+            <p className="text-gray-300 mb-4">
+              Close registration for specific dates. Users won't be able to register on closed dates, 
+              but can still register on-the-spot during event hours if enabled.
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {events.map((event) => (
+                <div key={event.id} className="bg-gray-700 rounded-lg p-4">
+                  <h4 className="text-white font-medium mb-3">{event.title}</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-300">Today</span>
+                      <button
+                        onClick={() => handleToggleDailyClosure(event, new Date().toISOString().split('T')[0])}
+                        className={`px-3 py-1 rounded text-xs font-medium ${
+                          event.dailyRegistrationClosure?.[new Date().toISOString().split('T')[0]]
+                            ? 'bg-red-600 text-white'
+                            : 'bg-green-600 text-white'
+                        }`}
+                      >
+                        {event.dailyRegistrationClosure?.[new Date().toISOString().split('T')[0]]
+                          ? 'Closed'
+                          : 'Open'
+                        }
+                      </button>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-300">Event Day</span>
+                      <button
+                        onClick={() => handleToggleDailyClosure(event, event.date)}
+                        className={`px-3 py-1 rounded text-xs font-medium ${
+                          event.dailyRegistrationClosure?.[event.date]
+                            ? 'bg-red-600 text-white'
+                            : 'bg-green-600 text-white'
+                        }`}
+                      >
+                        {event.dailyRegistrationClosure?.[event.date]
+                          ? 'Closed'
+                          : 'Open'
+                        }
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* On-the-Spot Pricing Management */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-semibold text-white mb-6">On-the-Spot Pricing</h2>
+          <div className="bg-gray-800 rounded-xl p-6">
+            <p className="text-gray-300 mb-4">
+              Update on-the-spot registration pricing after regular registration closes. 
+              This allows you to adjust pricing for last-minute registrations.
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {events.map((event) => (
+                <div key={event.id} className="bg-gray-700 rounded-lg p-4">
+                  <h4 className="text-white font-medium mb-3">{event.title}</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm text-gray-300 mb-1">Regular Fee</label>
+                      <div className="text-lg font-semibold text-cyan-400">₹{event.entryFee}</div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm text-gray-300 mb-1">On-the-Spot Fee</label>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="number"
+                          value={event.onSpotEntryFee || event.entryFee}
+                          onChange={(e) => handleUpdateOnSpotPricing(event, parseFloat(e.target.value) || 0)}
+                          className="flex-1 px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm"
+                          min="0"
+                          step="0.01"
+                        />
+                        <button
+                          onClick={() => handleUpdateOnSpotPricing(event, event.onSpotEntryFee || event.entryFee)}
+                          className="px-2 py-1 bg-cyan-600 text-white rounded text-xs hover:bg-cyan-700"
+                        >
+                          Update
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="text-xs text-gray-400">
+                      {event.allowOnSpotRegistration ? (
+                        <span className="text-green-400">On-the-spot enabled</span>
+                      ) : (
+                        <span className="text-red-400">On-the-spot disabled</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 

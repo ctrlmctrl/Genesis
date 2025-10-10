@@ -7,53 +7,45 @@ export interface RoleUser {
   email: string;
 }
 
-// Predefined credentials for volunteers and admins
-const ROLE_CREDENTIALS = {
+// Predefined user IDs for volunteers and admins
+const ROLE_USERS = {
   volunteer: {
+    id: 'vol-001',
     username: 'volunteer',
-    password: 'volunteer123',
-    user: {
-      id: 'vol-001',
-      username: 'volunteer',
-      role: 'volunteer' as const,
-      name: 'Event Volunteer',
-      email: 'volunteer@genesis.com'
-    }
+    role: 'volunteer' as const,
+    name: 'Event Volunteer',
+    email: 'volunteer@genesis.com'
   },
   admin: {
+    id: 'admin-001',
     username: 'admin',
-    password: 'admin123',
-    user: {
-      id: 'admin-001',
-      username: 'admin',
-      role: 'admin' as const,
-      name: 'Event Administrator',
-      email: 'admin@genesis.com'
-    }
+    role: 'admin' as const,
+    name: 'Event Administrator',
+    email: 'admin@genesis.com'
   }
 };
 
 class RoleAuthService {
   private currentUser: RoleUser | null = null;
 
-  async login(username: string, password: string): Promise<RoleUser> {
+  async login(userId: string): Promise<RoleUser> {
     // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
 
-    // Check credentials
-    if (username === ROLE_CREDENTIALS.volunteer.username && password === ROLE_CREDENTIALS.volunteer.password) {
-      this.currentUser = ROLE_CREDENTIALS.volunteer.user;
+    // Check user ID
+    if (userId === ROLE_USERS.volunteer.username) {
+      this.currentUser = ROLE_USERS.volunteer;
       localStorage.setItem('roleUser', JSON.stringify(this.currentUser));
       return this.currentUser;
     }
 
-    if (username === ROLE_CREDENTIALS.admin.username && password === ROLE_CREDENTIALS.admin.password) {
-      this.currentUser = ROLE_CREDENTIALS.admin.user;
+    if (userId === ROLE_USERS.admin.username) {
+      this.currentUser = ROLE_USERS.admin;
       localStorage.setItem('roleUser', JSON.stringify(this.currentUser));
       return this.currentUser;
     }
 
-    throw new Error('Invalid username or password');
+    throw new Error('Invalid User ID');
   }
 
   logout(): void {

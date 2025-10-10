@@ -153,3 +153,29 @@ firestore-debug.log
 test-results/
 playwright-report/
 playwright/.cache/
+
+# Project specific
+src/services/firebaseTest.ts
+*.md
+!README.md
+!CHANGELOG.md
+
+# Documentation files (keep only essential ones)
+CAMERA_CONFIGURATION.md
+MOBILE_ACCESS.md
+QR_CODE_ISSUE_CONTEXT.md
+QR_DEBUG_GUIDE.md
+QR_MIGRATION_COMPLETE.md
+QR_SCANNER_CODE_SNIPPET.md
+QR_SCANNER_TROUBLESHOOTING.md
+QR_SCANNING_OPTIONS.md
+QR_UNIQUE_SYSTEM_DOCUMENTATION.md
+REACT_QR_ALTERNATIVES.md
+REACT_QR_READER_IMPLEMENTATION.md
+REACT_QR_READER_SUCCESS.md
+
+# Scripts and configs
+create-cert.bat
+deploy-firebase.js
+start-https.sh
+test-qr-scanner.html

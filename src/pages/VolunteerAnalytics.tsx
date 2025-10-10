@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Users, CheckCircle, Clock, DollarSign, TrendingUp, BarChart3 } from 'lucide-react';
 import { Participant, Event } from '../types';
 import { dataService } from '../services/dataService';
+import { realtimeService } from '../services/realtimeService';
 import { roleAuthService, RoleUser } from '../services/roleAuth';
 import RoleLogin from '../components/RoleLogin';
 import toast from 'react-hot-toast';
@@ -28,11 +29,62 @@ const VolunteerAnalytics: React.FC = () => {
     const currentUser = roleAuthService.getCurrentUser();
     if (currentUser && currentUser.role === 'volunteer') {
       setUser(currentUser);
-      loadData();
+      setupRealtimeListeners();
     } else {
       setLoading(false);
     }
   }, []);
+
+  const setupRealtimeListeners = () => {
+    // Check if we're using Firebase (production) or localStorage (development)
+    const isFirebase = process.env.REACT_APP_STORAGE_MODE === 'firebase' || 
+                      (process.env.NODE_ENV === 'production' && !process.env.REACT_APP_STORAGE_MODE);
+
+    if (isFirebase) {
+      // Use real-time listeners for Firebase
+      const unsubscribeParticipants = realtimeService.listenToParticipants((participantsData) => {
+        setParticipants(participantsData);
+        calculateAnalytics(participantsData, events);
+      });
+
+      const unsubscribeEvents = realtimeService.listenToEvents((eventsData) => {
+        setEvents(eventsData);
+        calculateAnalytics(participants, eventsData);
+        setLoading(false);
+      });
+
+      return () => {
+        unsubscribeParticipants();
+        unsubscribeEvents();
+      };
+    } else {
+      // Fallback to regular data loading for development
+      loadData();
+    }
+  };
+
+  const calculateAnalytics = (participantsData: Participant[], eventsData: Event[]) => {
+    const totalParticipants = participantsData.length;
+    const verifiedParticipants = participantsData.filter((p: Participant) => p.isVerified).length;
+    const pendingParticipants = totalParticipants - verifiedParticipants;
+    const totalEvents = eventsData.length;
+    const totalRevenue = participantsData
+      .filter((p: Participant) => p.paymentStatus === 'paid' || p.paymentStatus === 'offline_paid')
+      .reduce((sum: number, p: Participant) => {
+        const event = eventsData.find((e: Event) => e.id === p.eventId);
+        return sum + (event?.entryFee || 0);
+      }, 0);
+    const verificationRate = totalParticipants > 0 ? (verifiedParticipants / totalParticipants) * 100 : 0;
+    
+    setAnalytics({
+      totalParticipants,
+      verifiedParticipants,
+      pendingParticipants,
+      totalEvents,
+      totalRevenue,
+      verificationRate
+    });
+  };
 
   const loadData = async () => {
     try {
@@ -43,28 +95,7 @@ const VolunteerAnalytics: React.FC = () => {
       
       setParticipants(participantsData);
       setEvents(eventsData);
-      
-      // Calculate analytics
-      const totalParticipants = participantsData.length;
-      const verifiedParticipants = participantsData.filter((p: Participant) => p.isVerified).length;
-      const pendingParticipants = totalParticipants - verifiedParticipants;
-      const totalEvents = eventsData.length;
-      const totalRevenue = participantsData
-        .filter((p: Participant) => p.paymentStatus === 'paid' || p.paymentStatus === 'offline_paid')
-        .reduce((sum: number, p: Participant) => {
-          const event = eventsData.find((e: Event) => e.id === p.eventId);
-          return sum + (event?.entryFee || 0);
-        }, 0);
-      const verificationRate = totalParticipants > 0 ? (verifiedParticipants / totalParticipants) * 100 : 0;
-      
-      setAnalytics({
-        totalParticipants,
-        verifiedParticipants,
-        pendingParticipants,
-        totalEvents,
-        totalRevenue,
-        verificationRate
-      });
+      calculateAnalytics(participantsData, eventsData);
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load analytics data');
@@ -75,7 +106,7 @@ const VolunteerAnalytics: React.FC = () => {
 
   const handleLogin = (loggedInUser: RoleUser) => {
     setUser(loggedInUser);
-    loadData();
+    setupRealtimeListeners();
   };
 
   if (loading) {
@@ -171,7 +202,10 @@ const VolunteerAnalytics: React.FC = () => {
                 <div className="flex items-start justify-between mb-3">
                   <h3 className="text-lg font-semibold text-white">{event.title}</h3>
                   <span className="text-sm text-gray-400">
-                    {eventParticipants.length}{event.maxParticipants ? `/${event.maxParticipants}` : ''} participants
+                    {event.isTeamEvent 
+                      ? `${Math.ceil(eventParticipants.length / (event.teamSize || 1))} teams (${eventParticipants.length} members)${event.maxTeams ? ` / ${event.maxTeams} max teams` : ''}`
+                      : `${eventParticipants.length} participants`
+                    }
                   </span>
                 </div>
 
@@ -201,6 +235,16 @@ const VolunteerAnalytics: React.FC = () => {
                       style={{ width: `${eventParticipants.length > 0 ? (verifiedCount / eventParticipants.length) * 100 : 0}%` }}
                     ></div>
                   </div>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <Link
+                    to={`/event/${event.id}/participants`}
+                    className="btn-secondary text-sm flex items-center"
+                  >
+                    <Users className="h-4 w-4 mr-1" />
+                    View Participants
+                  </Link>
                 </div>
               </motion.div>
             );

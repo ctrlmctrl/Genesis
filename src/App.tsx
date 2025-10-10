@@ -11,12 +11,18 @@ import VolunteerAnalytics from './pages/VolunteerAnalytics';
 import ParticipantDashboard from './pages/ParticipantDashboard';
 import AdminPage from './pages/AdminPage';
 import EventDetails from './pages/EventDetails';
+import EventParticipants from './pages/EventParticipants';
 import { dataService } from './services/dataService';
+import { realtimeService } from './services/realtimeService';
 
 function App() {
+  // Sample data initialization is handled in dataService constructor
+
   useEffect(() => {
-    // Initialize sample data
-    dataService.initializeSampleData();
+    // Cleanup real-time listeners when app unmounts
+    return () => {
+      realtimeService.cleanup();
+    };
   }, []);
 
   return (
@@ -47,6 +53,7 @@ function App() {
             <Route path="/vol/analytics" element={<VolunteerAnalytics />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/events/:eventId" element={<EventDetails />} />
+            <Route path="/event/:eventId/participants" element={<EventParticipants />} />
           </Routes>
         </div>
       </Router>

@@ -8,6 +8,7 @@ import { dataService } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import GoogleLogin from '../components/GoogleLogin';
 import PaymentModal from '../components/PaymentModal';
+import { canUserRegister, getRegistrationCountdown, isRegistrationOpen, isOnSpotRegistrationAvailable, getEntryFee, getPaymentMethod, getRegistrationType } from '../services/registrationService';
 
 interface RegistrationForm {
   fullName: string;
@@ -19,12 +20,18 @@ interface RegistrationForm {
 const EventRegistration: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [participantId, setParticipantId] = useState<string>('');
+  const [registrationStatus, setRegistrationStatus] = useState<{
+    canRegister: boolean;
+    reason?: string;
+    timeRemaining?: string;
+  }>({ canRegister: true });
+  const [registrationType, setRegistrationType] = useState<'regular' | 'on_spot'>('regular');
 
   const {
     register,
@@ -44,6 +51,14 @@ const EventRegistration: React.FC = () => {
           return;
         }
         setEvent(eventData);
+        
+        // Check registration status
+        const status = canUserRegister(eventData, user?.email);
+        setRegistrationStatus(status);
+        
+        // Determine registration type
+        const regType = getRegistrationType(eventData);
+        setRegistrationType(regType);
       } catch (error) {
         console.error('Error loading event:', error);
         toast.error('Failed to load event details');
@@ -53,22 +68,34 @@ const EventRegistration: React.FC = () => {
     };
 
     loadEvent();
-  }, [eventId, navigate]);
+  }, [eventId, navigate, user?.email]);
 
   const onSubmit = async (data: RegistrationForm) => {
     if (!event || !isAuthenticated) return;
     
+    // Check registration status before proceeding
+    const status = canUserRegister(event, user?.email);
+    if (!status.canRegister) {
+      toast.error(status.reason || 'Registration is not available');
+      return;
+    }
+    
     setSubmitting(true);
     try {
+      // Get the appropriate entry fee for the registration type
+      const entryFee = getEntryFee(event, registrationType);
+      
       const participant = await dataService.registerParticipant({
         eventId: event.id,
         ...data,
+        registrationType: registrationType,
+        entryFeePaid: entryFee,
       });
 
       setParticipantId(participant.id);
       
       // If event has entry fee, show payment modal
-      if (event.entryFee > 0) {
+      if (entryFee > 0) {
         setShowPaymentModal(true);
       } else {
         toast.success('Registration successful!');
@@ -83,13 +110,14 @@ const EventRegistration: React.FC = () => {
   };
 
 
-  const handlePaymentComplete = async (paymentId: string, method: 'online' | 'offline') => {
+  const handlePaymentComplete = async (paymentId: string, method: 'online' | 'offline', receiptUrl?: string) => {
     try {
       await dataService.updatePaymentStatus(
         participantId,
         method === 'online' ? 'paid' : 'offline_paid',
         method,
-        paymentId
+        paymentId,
+        receiptUrl
       );
       
       toast.success('Payment completed! Registration successful!');
@@ -156,7 +184,7 @@ const EventRegistration: React.FC = () => {
           <p className="text-gray-400 mb-6">
             Please sign in with Google to register for this event.
           </p>
-          <GoogleLogin />
+          <GoogleLogin variant="dark" />
         </div>
       </div>
     );
@@ -193,10 +221,6 @@ const EventRegistration: React.FC = () => {
             <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
             {event.location}
           </div>
-          <div className="flex items-center text-sm text-gray-400">
-            <Users className="h-4 w-4 mr-3 text-cyan-400" />
-            {event.currentParticipants} participants registered
-          </div>
           {event.entryFee > 0 && (
             <div className="flex items-center text-sm text-cyan-400">
               <DollarSign className="h-4 w-4 mr-3" />
@@ -205,6 +229,67 @@ const EventRegistration: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Registration Status */}
+      {event && (
+        <div className="card-glow mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-2">Registration Status</h3>
+              {registrationStatus.canRegister ? (
+                <div className="flex items-center text-green-400">
+                  <div className="w-3 h-3 bg-green-400 rounded-full mr-3"></div>
+                  <span>
+                    {registrationType === 'on_spot' 
+                      ? 'On-the-spot registration available' 
+                      : 'Registration is open'
+                    }
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center text-red-400">
+                  <div className="w-3 h-3 bg-red-400 rounded-full mr-3"></div>
+                  <span>{registrationStatus.reason}</span>
+                </div>
+              )}
+              
+              {/* Show pricing information */}
+              {registrationStatus.canRegister && (
+                <div className="mt-2 text-sm text-gray-300">
+                  {registrationType === 'on_spot' && event.onSpotEntryFee !== undefined ? (
+                    <div>
+                      <span className="text-yellow-400">On-the-spot fee: ₹{event.onSpotEntryFee}</span>
+                      {event.entryFee !== event.onSpotEntryFee && (
+                        <span className="text-gray-500 ml-2">(Regular: ₹{event.entryFee})</span>
+                      )}
+                      {event.onSpotStartTime && event.onSpotEndTime && (
+                        <div className="text-xs text-gray-400 mt-1">
+                          Available: {event.onSpotStartTime} - {event.onSpotEndTime}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span>Entry fee: ₹{event.entryFee}</span>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {event.registrationStartDate && event.registrationEndDate && (
+              <div className="text-right">
+                <div className="text-sm text-gray-400">
+                  {getRegistrationCountdown(event).message}
+                </div>
+                {getRegistrationCountdown(event).timeRemaining && (
+                  <div className="text-sm text-cyan-400 font-medium">
+                    {getRegistrationCountdown(event).timeRemaining}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Registration Form */}
       <div className="card-glow">
@@ -286,10 +371,13 @@ const EventRegistration: React.FC = () => {
           <div className="flex space-x-4">
             <button
               type="submit"
-              disabled={submitting}
-              className="btn-primary flex-1"
+              disabled={submitting || !registrationStatus.canRegister}
+              className={`btn-primary flex-1 ${!registrationStatus.canRegister ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {submitting ? 'Registering...' : 'Register for Event'}
+              {submitting ? 'Registering...' : 
+               !registrationStatus.canRegister ? 'Registration Closed' : 
+               registrationType === 'on_spot' ? 'Register On-the-Spot' :
+               'Register for Event'}
             </button>
             
             {event.isTeamEvent && (
@@ -302,14 +390,15 @@ const EventRegistration: React.FC = () => {
       </div>
 
       {/* Payment Modal */}
-      {event && event.entryFee > 0 && (
+      {event && getEntryFee(event, registrationType) > 0 && (
         <PaymentModal
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
           onPaymentComplete={handlePaymentComplete}
           eventTitle={event.title}
-          amount={event.entryFee}
+          amount={getEntryFee(event, registrationType)}
           upiId={event.upiId || 'genesis@upi'}
+          participantId={participantId}
         />
       )}
 

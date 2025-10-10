@@ -6,20 +6,32 @@ export interface Event {
   time: string;
   location: string;
   currentParticipants: number;
-  maxParticipants?: number; // Added back for admin control
   isActive: boolean;
   entryFee: number;
   paymentMethod: 'online' | 'offline' | 'both';
   upiId?: string;
   isTeamEvent: boolean;
   teamSize?: number; // Number of team members required
+  maxTeams?: number; // Maximum number of teams allowed (for team events)
   
-  // Registration deadline fields
+  // On-the-spot registration fields
+  allowOnSpotRegistration?: boolean; // Allow on-the-spot registration when event is being held
+  onSpotEntryFee?: number; // Different fee for on-the-spot registration
+  onSpotPaymentMethod?: 'online' | 'offline' | 'both'; // Payment method for on-the-spot
+  onSpotStartTime?: string; // HH:MM format - when on-the-spot registration starts
+  onSpotEndTime?: string; // HH:MM format - when on-the-spot registration ends
+  
+  // Registration deadline fields (for regular registration)
   registrationStartDate?: string; // YYYY-MM-DD format
   registrationStartTime?: string; // HH:MM format
   registrationEndDate?: string;   // YYYY-MM-DD format
   registrationEndTime?: string;   // HH:MM format
   allowLateRegistration?: boolean; // Admin/volunteer override
+  
+  // Daily registration closure
+  dailyRegistrationClosure?: {
+    [date: string]: boolean; // YYYY-MM-DD format -> true if registration closed for that day
+  };
   
   createdAt: string;
   updatedAt: string;
@@ -43,6 +55,8 @@ export interface Participant {
   paymentMethod?: 'online' | 'offline';
   paymentId?: string;
   receiptUrl?: string;
+  registrationType?: 'regular' | 'on_spot'; // Track registration type
+  entryFeePaid?: number; // Track actual fee paid (for on-the-spot different pricing)
 }
 
 export interface ParticipantInfo {

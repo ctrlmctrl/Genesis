@@ -2,16 +2,17 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Users, Sparkles, Zap, User, MapPin, DollarSign } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Event } from '../types';
+import { Event, Participant } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import GoogleLogin from './GoogleLogin';
 
 interface TechyLandingProps {
   events: Event[];
+  participants: Participant[];
   loading: boolean;
 }
 
-const TechyLanding: React.FC<TechyLandingProps> = ({ events, loading }) => {
+const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loading }) => {
   const { user, isAuthenticated } = useAuth();
 
   const formatDate = (dateString: string) => {
@@ -23,6 +24,18 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, loading }) => {
       day: 'numeric'
     });
   };
+
+  // Filter out events that user is already registered for
+  const getAvailableEvents = () => {
+    if (!isAuthenticated || !participants.length) {
+      return events;
+    }
+    
+    const registeredEventIds = participants.map(p => p.eventId);
+    return events.filter(event => !registeredEventIds.includes(event.id));
+  };
+
+  const availableEvents = getAvailableEvents();
 
   return (
     <div className="min-h-screen tech-bg">
@@ -72,9 +85,9 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, loading }) => {
                   Welcome to the Future
                 </h2>
                 <p className="text-gray-300 mb-6">
-                  Sign in with Google to access exclusive events and cutting-edge technology experiences.
+                  Discover exclusive events and cutting-edge technology experiences. Sign in below to register for events.
                 </p>
-                <GoogleLogin />
+                <GoogleLogin variant="dark" />
               </div>
             </motion.div>
           ) : (
@@ -144,20 +157,6 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, loading }) => {
             </h2>
             <div className="w-24 h-1 bg-gradient-to-r from-cyan-500 to-blue-500 mx-auto rounded-full"></div>
             
-            {/* Sign-in prompt for events when not authenticated */}
-            {!isAuthenticated && (
-              <motion.div
-                className="mt-6 p-4 bg-cyan-500/10 rounded-lg border border-cyan-500/20"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 1.4, duration: 0.5 }}
-              >
-                <p className="text-cyan-300 mb-3">
-                  🎯 Sign in with Google to register for events
-                </p>
-                <GoogleLogin />
-              </motion.div>
-            )}
           </div>
           
           {loading ? (
@@ -168,14 +167,23 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, loading }) => {
                 transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
               />
             </div>
-          ) : events.length === 0 ? (
+          ) : availableEvents.length === 0 ? (
             <div className="card-glow text-center py-12">
               <Calendar className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-xl font-semibold text-white mb-2">No Events Available</h3>
-              <p className="text-gray-400">Check back later for upcoming tech events</p>
+              <h3 className="text-xl font-semibold text-white mb-2">
+                {events.length === 0 ? "No Events Available" : "No Available Events"}
+              </h3>
+              <p className="text-gray-400">
+                {events.length === 0 
+                  ? "No events are currently available for registration" 
+                  : isAuthenticated 
+                    ? "You're registered for all available events!" 
+                    : "No events are currently available for registration"
+                }
+              </p>
             </div>
           ) : (
-            events.map((event, index) => (
+            availableEvents.map((event, index) => (
               <motion.div
                 key={event.id}
                 className="card-glow hover:scale-105 transition-all duration-300 group"
@@ -214,7 +222,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, loading }) => {
                   {event.isTeamEvent && (
                     <div className="flex items-center text-purple-400">
                       <Users className="h-4 w-4 mr-3" />
-                      Team Event ({event.teamSize} members)
+                      Team Event ({event.teamSize} members{event.maxTeams ? `, max ${event.maxTeams} teams` : ''})
                     </div>
                   )}
                 </div>
@@ -225,18 +233,20 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, loading }) => {
                     Registration Open
                   </div>
                   
-                  {isAuthenticated ? (
-                    <Link
-                      to={`/register/${event.id}`}
-                      className="btn-primary"
-                    >
-                      Register Now
-                    </Link>
+                  <div className="flex items-center space-x-3">
+                    {isAuthenticated ? (
+                      <Link
+                        to={`/register/${event.id}`}
+                        className="btn-primary"
+                      >
+                        Register Now
+                      </Link>
                   ) : (
                     <div className="text-sm text-gray-400">
-                      Sign in to register
+                      Sign in required
                     </div>
                   )}
+                  </div>
                 </div>
               </motion.div>
             ))
