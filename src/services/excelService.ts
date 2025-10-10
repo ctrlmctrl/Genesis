@@ -84,7 +84,7 @@ export class ExcelService {
         description: event.description,
         date: new Date(event.date).toLocaleDateString(),
         time: event.time,
-        location: event.location,
+        roomNo: event.roomNo || 'Not assigned',
         entryFee: `₹${event.entryFee}`,
         paymentMethod: event.paymentMethod,
         currentParticipants: event.currentParticipants,

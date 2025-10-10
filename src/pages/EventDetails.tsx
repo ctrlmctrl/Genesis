@@ -127,10 +127,12 @@ const EventDetails: React.FC = () => {
             <Clock className="h-4 w-4 mr-3" />
             {event.time}
           </div>
-          <div className="flex items-center text-sm text-gray-600">
-            <MapPin className="h-4 w-4 mr-3" />
-            {event.location}
-          </div>
+          {event.roomNo && (
+            <div className="flex items-center text-sm text-gray-600">
+              <MapPin className="h-4 w-4 mr-3" />
+              Room: {event.roomNo}
+            </div>
+          )}
           <div className="flex items-center text-sm text-gray-600">
             <Users className="h-4 w-4 mr-3" />
             {event.currentParticipants} participants registered

@@ -269,10 +269,12 @@ const EventParticipants: React.FC = () => {
         <p className="text-gray-600 mb-4">{event.description}</p>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div className="flex items-center text-gray-600">
-            <MapPin className="h-4 w-4 mr-2" />
-            {event.location}
-          </div>
+          {event.roomNo && (
+            <div className="flex items-center text-gray-600">
+              <MapPin className="h-4 w-4 mr-2" />
+              Room: {event.roomNo}
+            </div>
+          )}
           <div className="flex items-center text-gray-600">
             <Users className="h-4 w-4 mr-2" />
             {event.isTeamEvent 

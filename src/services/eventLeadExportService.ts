@@ -77,7 +77,7 @@ class EventLeadExportService {
     eventSheet.addRow(['Event Description', event.description]);
     eventSheet.addRow(['Event Date', new Date(event.date).toLocaleDateString()]);
     eventSheet.addRow(['Event Time', event.time]);
-    eventSheet.addRow(['Event Location', event.location]);
+    eventSheet.addRow(['Event Room', event.roomNo || 'Not assigned']);
     eventSheet.addRow(['Entry Fee', `₹${event.entryFee}`]);
     eventSheet.addRow(['Total Participants', participants.length]);
     eventSheet.addRow(['Verified Participants', participants.filter(p => p.isVerified).length]);

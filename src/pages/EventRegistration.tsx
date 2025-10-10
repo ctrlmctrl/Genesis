@@ -222,10 +222,12 @@ const EventRegistration: React.FC = () => {
             <Clock className="h-4 w-4 mr-3 text-cyan-400" />
             {event.time}
           </div>
-          <div className="flex items-center text-sm text-gray-400">
-            <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
-            {event.location}
-          </div>
+          {event.roomNo && (
+            <div className="flex items-center text-sm text-gray-400">
+              <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
+              Room: {event.roomNo}
+            </div>
+          )}
           {event.entryFee > 0 && (
             <div className="flex items-center text-sm text-cyan-400">
               <DollarSign className="h-4 w-4 mr-3" />
