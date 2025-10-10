@@ -9,10 +9,10 @@ import { useAuth } from '../contexts/AuthContext';
 import GoogleLogin from '../components/GoogleLogin';
 import PaymentModal from '../components/PaymentModal';
 import { canUserRegister, getRegistrationCountdown, isRegistrationOpen, isOnSpotRegistrationAvailable, getEntryFee, getPaymentMethod, getRegistrationType } from '../services/registrationService';
+import { paymentService } from '../services/paymentService';
 
 interface RegistrationForm {
   fullName: string;
-  email: string;
   phone: string;
   college: string;
 }
@@ -85,11 +85,16 @@ const EventRegistration: React.FC = () => {
       // Get the appropriate entry fee for the registration type
       const entryFee = getEntryFee(event, registrationType);
       
+      // Generate unique payment identifier for UPI transaction matching
+      const paymentIdentifier = paymentService.generatePaymentIdentifier();
+      
       const participant = await dataService.registerParticipant({
         eventId: event.id,
         ...data,
+        email: user?.email || '', // Get email from authenticated user
         registrationType: registrationType,
         entryFeePaid: entryFee,
+        paymentIdentifier: paymentIdentifier,
       });
 
       setParticipantId(participant.id);
@@ -311,26 +316,6 @@ const EventRegistration: React.FC = () => {
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Email Address *
-            </label>
-            <input
-              type="email"
-              {...register('email', { 
-                required: 'Email is required',
-                pattern: {
-                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: 'Invalid email address'
-                }
-              })}
-              className="input-field"
-              placeholder="Enter your email address"
-            />
-            {errors.email && (
-              <p className="text-red-400 text-sm mt-1">{errors.email.message}</p>
-            )}
-          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">

@@ -202,6 +202,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                 <div className="text-center text-sm text-gray-400">
                   <p>UPI ID: {upiId}</p>
                   <p>Transaction ID: {paymentId}</p>
+                  {participantId && (
+                    <p className="text-yellow-400 font-medium">
+                      Payment ID: {participantId.slice(-8).toUpperCase()}
+                    </p>
+                  )}
                 </div>
               </div>
             )}

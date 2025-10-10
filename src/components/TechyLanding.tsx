@@ -198,17 +198,13 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                     </h3>
                     <p className="text-gray-300 mb-4">{event.description}</p>
                   </div>
-                  <div className="flex items-center text-cyan-400 ml-4">
-                    <Users className="h-5 w-5 mr-1" />
-                    <span className="text-sm font-medium">{event.currentParticipants}</span>
+                  <div className="flex items-center text-blue-400 ml-4">
+                    <Calendar className="h-5 w-5 mr-1" />
+                    <span className="text-sm font-medium">{event.eventDay === 'day1' ? 'Day 1' : 'Day 2'}</span>
                   </div>
                 </div>
                 
                 <div className="space-y-3 mb-6">
-                  <div className="flex items-center text-gray-400">
-                    <Calendar className="h-4 w-4 mr-3 text-cyan-400" />
-                    {formatDate(event.date)} at {event.time}
-                  </div>
                   <div className="flex items-center text-gray-400">
                     <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
                     {event.location}
@@ -222,7 +218,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                   {event.isTeamEvent && (
                     <div className="flex items-center text-purple-400">
                       <Users className="h-4 w-4 mr-3" />
-                      Team Event ({event.teamSize} members{event.maxTeams ? `, max ${event.maxTeams} teams` : ''})
+                      Team Event ({event.membersPerTeam || event.teamSize} members{event.maxTeams ? `, max ${event.maxTeams} teams` : ''})
                     </div>
                   )}
                 </div>

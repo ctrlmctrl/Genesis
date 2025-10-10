@@ -13,6 +13,8 @@ export interface Event {
   isTeamEvent: boolean;
   teamSize?: number; // Number of team members required
   maxTeams?: number; // Maximum number of teams allowed (for team events)
+  eventDay: 'day1' | 'day2'; // Event categorization
+  membersPerTeam?: number; // Number of members allowed per team
   
   // On-the-spot registration fields
   allowOnSpotRegistration?: boolean; // Allow on-the-spot registration when event is being held
@@ -57,6 +59,7 @@ export interface Participant {
   receiptUrl?: string;
   registrationType?: 'regular' | 'on_spot'; // Track registration type
   entryFeePaid?: number; // Track actual fee paid (for on-the-spot different pricing)
+  paymentIdentifier?: string; // Unique identifier for UPI transaction matching
 }
 
 export interface ParticipantInfo {

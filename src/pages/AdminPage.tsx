@@ -47,6 +47,8 @@ const AdminPage: React.FC = () => {
     upiId: '',
     isTeamEvent: false,
     teamSize: 1,
+    eventDay: 'day1' as 'day1' | 'day2',
+    membersPerTeam: 1,
     // On-the-spot registration fields
     allowOnSpotRegistration: false,
     onSpotEntryFee: 0,
@@ -132,6 +134,9 @@ const AdminPage: React.FC = () => {
         upiId: '',
         isTeamEvent: false,
         teamSize: 1,
+        // Event categorization and team settings
+        eventDay: 'day1',
+        membersPerTeam: 1,
         // On-the-spot registration fields
         allowOnSpotRegistration: false,
         onSpotEntryFee: 0,
@@ -161,6 +166,9 @@ const AdminPage: React.FC = () => {
       upiId: event.upiId || '',
       isTeamEvent: event.isTeamEvent,
       teamSize: event.teamSize || 1,
+      // Event categorization and team settings
+      eventDay: event.eventDay || 'day1',
+      membersPerTeam: event.membersPerTeam || 1,
       // On-the-spot registration fields
       allowOnSpotRegistration: event.allowOnSpotRegistration || false,
       onSpotEntryFee: event.onSpotEntryFee || 0,
@@ -197,6 +205,9 @@ const AdminPage: React.FC = () => {
         upiId: '',
         isTeamEvent: false,
         teamSize: 1,
+        // Event categorization and team settings
+        eventDay: 'day1',
+        membersPerTeam: 1,
         // On-the-spot registration fields
         allowOnSpotRegistration: false,
         onSpotEntryFee: 0,
@@ -607,6 +618,36 @@ const AdminPage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Event Day *
+                </label>
+                <select
+                  value={newEvent.eventDay}
+                  onChange={(e) => setNewEvent({ ...newEvent, eventDay: e.target.value as 'day1' | 'day2' })}
+                  className="input-field"
+                >
+                  <option value="day1">Day 1</option>
+                  <option value="day2">Day 2</option>
+                </select>
+              </div>
+
+              {newEvent.isTeamEvent && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Members Per Team
+                  </label>
+                  <input
+                    type="number"
+                    value={newEvent.membersPerTeam}
+                    onChange={(e) => setNewEvent({ ...newEvent, membersPerTeam: parseInt(e.target.value) || 1 })}
+                    className="input-field"
+                    placeholder="Enter members per team"
+                    min="1"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Payment Method *
                 </label>
                 <select
@@ -818,6 +859,31 @@ const AdminPage: React.FC = () => {
                   min="1"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Event Day</label>
+                <select
+                  value={newEvent.eventDay}
+                  onChange={(e) => setNewEvent({ ...newEvent, eventDay: e.target.value as 'day1' | 'day2' })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                >
+                  <option value="day1">Day 1</option>
+                  <option value="day2">Day 2</option>
+                </select>
+              </div>
+
+              {newEvent.isTeamEvent && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Members Per Team</label>
+                  <input
+                    type="number"
+                    value={newEvent.membersPerTeam}
+                    onChange={(e) => setNewEvent({ ...newEvent, membersPerTeam: parseInt(e.target.value) || 1 })}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    min="1"
+                  />
+                </div>
+              )}
               
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Payment Method</label>

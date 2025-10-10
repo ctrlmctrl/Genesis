@@ -30,6 +30,13 @@ export class PaymentService {
     return 'PAY_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   }
 
+  generatePaymentIdentifier(): string {
+    // Generate a unique identifier for UPI transaction matching
+    const timestamp = Date.now().toString();
+    const random = Math.random().toString(36).substr(2, 6).toUpperCase();
+    return `GEN${timestamp.slice(-6)}${random}`;
+  }
+
   formatAmount(amount: number): string {
     return `₹${amount.toFixed(2)}`;
   }

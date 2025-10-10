@@ -504,8 +504,9 @@ class DataService {
       throw new Error('This is not a team event');
     }
 
-    if (teamMembers.length !== (event.teamSize || 1)) {
-      throw new Error(`Team must have exactly ${event.teamSize} members`);
+    const requiredMembers = event.membersPerTeam || event.teamSize || 1;
+    if (teamMembers.length !== requiredMembers) {
+      throw new Error(`Team must have exactly ${requiredMembers} members`);
     }
 
     const teamId = `team-${Date.now()}`;
@@ -556,9 +557,10 @@ class DataService {
         throw new Error('This is not a team event');
       }
 
-      if (teamMembers.length !== (event.teamSize || 1)) {
-        throw new Error(`Team must have exactly ${event.teamSize} members`);
-      }
+    const requiredMembers = event.membersPerTeam || event.teamSize || 1;
+    if (teamMembers.length !== requiredMembers) {
+      throw new Error(`Team must have exactly ${requiredMembers} members`);
+    }
 
       const teamId = `team-${Date.now()}`;
       const registeredMembers: Participant[] = [];
@@ -733,6 +735,8 @@ class DataService {
       paymentMethod: 'both',
       upiId: 'genesis@upi',
       isTeamEvent: false,
+      eventDay: 'day1',
+      membersPerTeam: 1,
       registrationStartDate: '2024-02-01',
       registrationStartTime: '00:00',
       registrationEndDate: '2024-03-10',
@@ -757,6 +761,8 @@ class DataService {
       isTeamEvent: true,
       teamSize: 4,
       maxTeams: 25, // Maximum 25 teams allowed
+      eventDay: 'day2',
+      membersPerTeam: 4,
       registrationStartDate: '2024-02-15',
       registrationStartTime: '00:00',
       registrationEndDate: '2024-03-15',

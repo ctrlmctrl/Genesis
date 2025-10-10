@@ -3,11 +3,11 @@ import { motion } from 'framer-motion';
 import { Users, User } from 'lucide-react';
 import { Event } from '../types';
 import { dataService } from '../services/dataService';
+import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 interface TeamMember {
   fullName: string;
-  email: string;
   phone: string;
   college: string;
 }
@@ -19,14 +19,15 @@ interface TeamRegistrationFormProps {
 }
 
 const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSuccess, onCancel }) => {
+  const { user } = useAuth();
   const [teamName, setTeamName] = useState('');
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(() => {
     // Initialize with required number of team members
     const members: TeamMember[] = [];
-    for (let i = 0; i < (event.teamSize || 1); i++) {
+    const memberCount = event.membersPerTeam || event.teamSize || 1;
+    for (let i = 0; i < memberCount; i++) {
       members.push({
         fullName: '',
-        email: '',
         phone: '',
         college: '',
       });
@@ -55,7 +56,7 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
     // Validate all team members
     for (let i = 0; i < teamMembers.length; i++) {
       const member = teamMembers[i];
-      if (!member.fullName.trim() || !member.email.trim() || !member.phone.trim() || !member.college.trim()) {
+      if (!member.fullName.trim() || !member.phone.trim() || !member.college.trim()) {
         toast.error(`Please fill all details for team member ${i + 1}`);
         return;
       }
@@ -63,7 +64,13 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
 
     setLoading(true);
     try {
-      const participants = await dataService.registerTeam(event.id, teamName, teamMembers);
+      // Add email from authenticated user to each team member
+      const teamMembersWithEmail = teamMembers.map(member => ({
+        ...member,
+        email: user?.email || ''
+      }));
+      
+      const participants = await dataService.registerTeam(event.id, teamName, teamMembersWithEmail);
       toast.success(`Team "${teamName}" registered successfully!`);
       onSuccess(participants);
     } catch (error) {
@@ -163,19 +170,6 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        Email *
-                      </label>
-                      <input
-                        type="email"
-                        value={member.email}
-                        onChange={(e) => handleMemberChange(index, 'email', e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                        placeholder="Enter email address"
-                        required
-                      />
-                    </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">
