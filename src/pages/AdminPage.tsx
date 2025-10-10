@@ -553,41 +553,14 @@ const AdminPage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Date *
-                </label>
-                <input
-                  type="date"
-                  value={newEvent.date}
-                  onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                  className="input-field"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Time *
-                </label>
-                <input
-                  type="time"
-                  value={newEvent.time}
-                  onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
-                  className="input-field"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Location *
+                  Room No. (Optional)
                 </label>
                 <input
                   type="text"
-                  value={newEvent.location}
-                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                  value={newEvent.roomNo}
+                  onChange={(e) => setNewEvent({ ...newEvent, roomNo: e.target.value })}
                   className="input-field"
-                  placeholder="Enter event location"
-                  required
+                  placeholder="e.g., Room 101, Hall A, etc. (Leave empty if not assigned yet)"
                 />
               </div>
 
@@ -1054,10 +1027,12 @@ const AdminPage: React.FC = () => {
                       <Calendar className="h-4 w-4 mr-2" />
                       {formatDate(event.date)} at {event.time}
                     </div>
-                    <div className="flex items-center text-sm text-gray-400">
-                      <Users className="h-4 w-4 mr-2" />
-                      {event.location}
-                    </div>
+                    {event.roomNo && (
+                      <div className="flex items-center text-sm text-gray-400">
+                        <Users className="h-4 w-4 mr-2" />
+                        Room: {event.roomNo}
+                      </div>
+                    )}
                     <div className="flex items-center text-sm text-gray-400">
                       <DollarSign className="h-4 w-4 mr-2" />
                       Entry Fee: ₹{event.entryFee}
