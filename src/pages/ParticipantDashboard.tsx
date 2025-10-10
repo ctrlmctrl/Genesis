@@ -173,18 +173,16 @@ const ParticipantDashboard: React.FC = () => {
                   <div className="space-y-2 mb-4">
                     {event ? (
                       <>
-                        <div className="flex items-center text-sm text-gray-400">
-                          <Calendar className="h-4 w-4 mr-3 text-cyan-400" />
-                          {new Date(event.date).toLocaleDateString()}
+                        <div className="flex items-center text-sm text-blue-400">
+                          <Calendar className="h-4 w-4 mr-3" />
+                          {event.eventDay === 'day1' ? 'Day 1 Event' : 'Day 2 Event'}
                         </div>
-                        <div className="flex items-center text-sm text-gray-400">
-                          <Clock className="h-4 w-4 mr-3 text-cyan-400" />
-                          {event.time}
-                        </div>
-                        <div className="flex items-center text-sm text-gray-400">
-                          <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
-                          {event.location}
-                        </div>
+                        {participant.assignedRoom && (
+                          <div className="flex items-center text-sm text-green-400">
+                            <MapPin className="h-4 w-4 mr-3" />
+                            Assigned Room: {participant.assignedRoom}
+                          </div>
+                        )}
                       </>
                     ) : (
                       <div className="flex items-center text-sm text-gray-400">
@@ -254,17 +252,13 @@ const ParticipantDashboard: React.FC = () => {
                 <p className="text-gray-300 mb-4 line-clamp-2">{event.description}</p>
 
                 <div className="space-y-2 mb-4">
-                  <div className="flex items-center text-sm text-gray-400">
-                    <Calendar className="h-4 w-4 mr-3 text-cyan-400" />
-                    {new Date(event.date).toLocaleDateString()}
-                  </div>
-                  <div className="flex items-center text-sm text-gray-400">
-                    <Clock className="h-4 w-4 mr-3 text-cyan-400" />
-                    {event.time}
+                  <div className="flex items-center text-sm text-blue-400">
+                    <Calendar className="h-4 w-4 mr-3" />
+                    {event.eventDay === 'day1' ? 'Day 1 Event' : 'Day 2 Event'}
                   </div>
                   <div className="flex items-center text-sm text-gray-400">
                     <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
-                    {event.location}
+                    Room will be assigned at check-in
                   </div>
                 </div>
 

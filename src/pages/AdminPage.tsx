@@ -38,9 +38,7 @@ const AdminPage: React.FC = () => {
   const [newEvent, setNewEvent] = useState({
     title: '',
     description: '',
-    date: '',
-    time: '',
-    location: '',
+    roomNo: '',
     entryFee: 0,
     maxTeams: 0,
     paymentMethod: 'both' as 'online' | 'offline' | 'both',
@@ -115,8 +113,14 @@ const AdminPage: React.FC = () => {
     e.preventDefault();
     
     try {
+      // Set date and time automatically based on eventDay
+      const eventDate = newEvent.eventDay === 'day1' ? '2024-11-13' : '2024-11-14';
+      const eventTime = '10:00'; // Default time
+      
       await dataService.createEvent({
         ...newEvent,
+        date: eventDate,
+        time: eventTime,
         isActive: true,
       });
       
@@ -125,9 +129,7 @@ const AdminPage: React.FC = () => {
       setNewEvent({
         title: '',
         description: '',
-        date: '',
-        time: '',
-        location: '',
+        roomNo: '',
         entryFee: 0,
         maxTeams: 0,
         paymentMethod: 'both',
@@ -157,9 +159,7 @@ const AdminPage: React.FC = () => {
     setNewEvent({
       title: event.title,
       description: event.description,
-      date: event.date,
-      time: event.time,
-      location: event.location,
+      roomNo: event.roomNo || '',
       entryFee: event.entryFee,
       maxTeams: event.maxTeams || 0,
       paymentMethod: event.paymentMethod,
@@ -185,8 +185,14 @@ const AdminPage: React.FC = () => {
     if (!editingEvent) return;
     
     try {
+      // Set date and time automatically based on eventDay
+      const eventDate = newEvent.eventDay === 'day1' ? '2024-11-13' : '2024-11-14';
+      const eventTime = '10:00'; // Default time
+      
       await dataService.updateEvent(editingEvent.id, {
         ...newEvent,
+        date: eventDate,
+        time: eventTime,
         isActive: true,
       });
       
@@ -196,9 +202,7 @@ const AdminPage: React.FC = () => {
       setNewEvent({
         title: '',
         description: '',
-        date: '',
-        time: '',
-        location: '',
+        roomNo: '',
         entryFee: 0,
         maxTeams: 0,
         paymentMethod: 'both',
@@ -806,35 +810,13 @@ const AdminPage: React.FC = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Date</label>
-                <input
-                  type="date"
-                  value={newEvent.date}
-                  onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Time</label>
-                <input
-                  type="time"
-                  value={newEvent.time}
-                  onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Location</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Room No. (Optional)</label>
                 <input
                   type="text"
-                  value={newEvent.location}
-                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                  value={newEvent.roomNo}
+                  onChange={(e) => setNewEvent({ ...newEvent, roomNo: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                  required
+                  placeholder="e.g., Room 101, Hall A, etc. (Leave empty if not assigned yet)"
                 />
               </div>
               

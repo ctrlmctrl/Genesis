@@ -2,9 +2,9 @@ export interface Event {
   id: string;
   title: string;
   description: string;
-  date: string;
-  time: string;
-  location: string;
+  date: string; // Will be set automatically based on eventDay
+  time: string; // Will be set automatically
+  roomNo?: string; // Optional room number set by admin
   currentParticipants: number;
   isActive: boolean;
   entryFee: number;
@@ -60,6 +60,7 @@ export interface Participant {
   registrationType?: 'regular' | 'on_spot'; // Track registration type
   entryFeePaid?: number; // Track actual fee paid (for on-the-spot different pricing)
   paymentIdentifier?: string; // Unique identifier for UPI transaction matching
+  assignedRoom?: string; // Room assigned during check-in/verification
 }
 
 export interface ParticipantInfo {

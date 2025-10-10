@@ -645,9 +645,9 @@ class DataService {
   }
 
   // QR Code Verification
-  async verifyParticipant(participantId: string, volunteerId: string): Promise<boolean> {
+  async verifyParticipant(participantId: string, volunteerId: string, assignedRoom?: string): Promise<boolean> {
     if (this.useFirebase) {
-      return this.verifyParticipantFirebase(participantId, volunteerId);
+      return this.verifyParticipantFirebase(participantId, volunteerId, assignedRoom);
     }
 
     const participant = this.participants.find(p => p.id === participantId);
@@ -655,6 +655,9 @@ class DataService {
 
     participant.isVerified = true;
     participant.verificationTime = new Date().toISOString();
+    if (assignedRoom) {
+      participant.assignedRoom = assignedRoom;
+    }
 
     // Record verification
     const verificationRecord: VerificationRecord = {
@@ -669,15 +672,21 @@ class DataService {
     return true;
   }
 
-  private async verifyParticipantFirebase(participantId: string, volunteerId: string): Promise<boolean> {
+  private async verifyParticipantFirebase(participantId: string, volunteerId: string, assignedRoom?: string): Promise<boolean> {
     try {
       // Update participant verification status
       const participantRef = doc(db, 'participants', participantId);
-      await updateDoc(participantRef, {
+      const updateData: any = {
         isVerified: true,
         verificationTime: new Date().toISOString(),
         updatedAt: new Date().toISOString()
-      });
+      };
+      
+      if (assignedRoom) {
+        updateData.assignedRoom = assignedRoom;
+      }
+      
+      await updateDoc(participantRef, updateData);
 
       // Create verification record
       const verificationRecord = {
@@ -726,9 +735,9 @@ class DataService {
       id: 'sample-event-1',
       title: 'Tech Conference 2024',
       description: 'Annual technology conference featuring the latest innovations in AI, blockchain, and cloud computing. Join industry leaders for networking and knowledge sharing.',
-      date: '2024-03-15',
-      time: '09:00',
-      location: 'Convention Center, Downtown',
+      date: '2024-11-13',
+      time: '10:00',
+      roomNo: 'Main Auditorium',
       currentParticipants: 0,
       isActive: true,
       entryFee: 500,
@@ -737,9 +746,9 @@ class DataService {
       isTeamEvent: false,
       eventDay: 'day1',
       membersPerTeam: 1,
-      registrationStartDate: '2024-02-01',
+      registrationStartDate: '2024-10-01',
       registrationStartTime: '00:00',
-      registrationEndDate: '2024-03-10',
+      registrationEndDate: '2024-11-10',
       registrationEndTime: '23:59',
       allowLateRegistration: false,
       createdAt: new Date().toISOString(),
@@ -750,9 +759,9 @@ class DataService {
       id: 'sample-event-2',
       title: 'Hackathon 2024',
       description: '48-hour coding competition for teams of 4. Build innovative solutions and win prizes!',
-      date: '2024-03-20',
+      date: '2024-11-14',
       time: '10:00',
-      location: 'Tech Hub, Bangalore',
+      roomNo: 'Computer Lab A',
       currentParticipants: 0,
       isActive: true,
       entryFee: 200,
@@ -763,9 +772,9 @@ class DataService {
       maxTeams: 25, // Maximum 25 teams allowed
       eventDay: 'day2',
       membersPerTeam: 4,
-      registrationStartDate: '2024-02-15',
+      registrationStartDate: '2024-10-15',
       registrationStartTime: '00:00',
-      registrationEndDate: '2024-03-15',
+      registrationEndDate: '2024-11-10',
       registrationEndTime: '23:59',
       allowLateRegistration: true,
       createdAt: new Date().toISOString(),

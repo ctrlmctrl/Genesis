@@ -143,6 +143,40 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
               </motion.div>
             )}
 
+        {/* Event Location Section */}
+        <motion.div
+          className="mb-12"
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.1, duration: 0.8 }}
+        >
+          <div className="card-glow text-center">
+            <h2 className="text-2xl font-semibold text-white mb-4 flex items-center justify-center">
+              <MapPin className="h-6 w-6 mr-2 text-cyan-400" />
+              Event Location
+            </h2>
+            <div className="space-y-3">
+              <p className="text-lg text-gray-300">
+                <strong className="text-cyan-400">Genesis Tech Fest 2024</strong>
+              </p>
+              <p className="text-gray-400">
+                November 13-14, 2024
+              </p>
+              <div className="mt-4">
+                <a 
+                  href="https://share.google/PZps8siI8yeIwYHm2" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-medium rounded-lg transition-colors duration-200"
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  View College Location
+                </a>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
         {/* Events Section */}
         <motion.div
           className="space-y-6"
@@ -206,15 +240,29 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                 
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center text-gray-400">
-                    <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
-                    {event.location}
+                    <Calendar className="h-4 w-4 mr-3 text-cyan-400" />
+                    {new Date(event.date).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
                   </div>
+                  
+                  {event.roomNo && (
+                    <div className="flex items-center text-gray-400">
+                      <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
+                      Room: {event.roomNo}
+                    </div>
+                  )}
+                  
                   {event.entryFee > 0 && (
                     <div className="flex items-center text-cyan-400">
                       <DollarSign className="h-4 w-4 mr-3" />
                       Entry Fee: ₹{event.entryFee}
                     </div>
                   )}
+                  
                   {event.isTeamEvent && (
                     <div className="flex items-center text-purple-400">
                       <Users className="h-4 w-4 mr-3" />

@@ -15,6 +15,7 @@ const VolunteerScanner: React.FC = () => {
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [showResult, setShowResult] = useState(false);
+  const [assignedRoom, setAssignedRoom] = useState('');
   const scannerRef = useRef<QrScanner | null>(null);
 
   useEffect(() => {
@@ -220,12 +221,18 @@ const VolunteerScanner: React.FC = () => {
   const handleVerify = async () => {
     if (!participant) return;
 
+    if (!assignedRoom.trim()) {
+      toast.error('Please assign a room number');
+      return;
+    }
+
     setVerifying(true);
     try {
-      const success = await dataService.verifyParticipant(participant.id, user?.id || 'volunteer');
+      const success = await dataService.verifyParticipant(participant.id, user?.id || 'volunteer', assignedRoom);
       if (success) {
-        toast.success('Participant verified successfully!');
-        setParticipant({ ...participant, isVerified: true });
+        toast.success(`Participant verified and assigned to ${assignedRoom}!`);
+        setParticipant({ ...participant, isVerified: true, assignedRoom });
+        setAssignedRoom(''); // Reset room input
       } else {
         toast.error('Failed to verify participant');
       }
@@ -240,6 +247,7 @@ const VolunteerScanner: React.FC = () => {
   const resetScanner = () => {
     setParticipant(null);
     setShowResult(false);
+    setAssignedRoom('');
   };
 
   if (!user) {
@@ -440,7 +448,39 @@ const VolunteerScanner: React.FC = () => {
               <label className="text-sm text-gray-400">Registration Date</label>
               <p className="text-white">{new Date(participant.registrationDate).toLocaleDateString()}</p>
             </div>
+
+            {participant.assignedRoom && (
+              <div>
+                <label className="text-sm text-gray-400">Assigned Room</label>
+                <p className="text-green-400 font-medium">{participant.assignedRoom}</p>
+              </div>
+            )}
+
+            {!participant.isVerified && (
+              <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <p className="text-blue-400 text-sm">
+                  <strong>Note:</strong> If admin has set a room number for this event, it will be shown here. 
+                  You can still assign a different room if needed.
+                </p>
+              </div>
+            )}
           </div>
+
+          {!participant.isVerified && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Assign Room Number *
+              </label>
+              <input
+                type="text"
+                value={assignedRoom}
+                onChange={(e) => setAssignedRoom(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                placeholder="e.g., Room 101, Hall A, etc."
+                required
+              />
+            </div>
+          )}
 
           <div className="flex space-x-3 mt-6">
             <button
