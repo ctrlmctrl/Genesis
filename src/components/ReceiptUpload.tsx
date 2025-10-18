@@ -1,27 +1,62 @@
 import React, { useState } from 'react';
-import { Upload, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, X, CheckCircle, AlertCircle, FileText, Image } from 'lucide-react';
+import { fileUploadService } from '../services/fileUploadService';
+import { dataService } from '../services/dataService';
 import toast from 'react-hot-toast';
 
 interface ReceiptUploadProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onUpload: (file: File) => Promise<void>;
   participantId: string;
-  eventTitle: string;
-  amount: number;
+  currentReceiptUrl?: string;
+  onUploadSuccess: (receiptUrl: string) => void;
+  onUploadError?: (error: string) => void;
 }
 
 const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
-  isOpen,
-  onClose,
-  onUpload,
   participantId,
-  eventTitle,
-  amount
+  currentReceiptUrl,
+  onUploadSuccess,
+  onUploadError
 }) => {
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleFileSelect = (file: File) => {
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload an image (JPG, PNG, WebP) or PDF file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Create preview for images
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPreviewUrl(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setPreviewUrl(null);
+    }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -37,167 +72,182 @@ const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const droppedFile = e.dataTransfer.files[0];
-      if (validateFile(droppedFile)) {
-        setFile(droppedFile);
-      }
-    }
-  };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      if (validateFile(selectedFile)) {
-        setFile(selectedFile);
-      }
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleFileSelect(file);
     }
-  };
-
-  const validateFile = (file: File): boolean => {
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
-    
-    if (file.size > maxSize) {
-      toast.error('File size must be less than 5MB');
-      return false;
-    }
-    
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Only JPG, PNG, WebP, and PDF files are allowed');
-      return false;
-    }
-    
-    return true;
   };
 
   const handleUpload = async () => {
-    if (!file) {
-      toast.error('Please select a file to upload');
+    if (!selectedFile) {
+      toast.error('Please select a file first');
       return;
     }
 
-    setUploading(true);
+    setIsUploading(true);
     try {
-      await onUpload(file);
+      const receiptUrl = await fileUploadService.uploadReceipt(selectedFile, participantId);
+      
+      // Update participant with receipt URL
+      await dataService.updatePaymentStatus(
+        participantId,
+        'paid',
+        'online',
+        receiptUrl
+      );
+
       toast.success('Receipt uploaded successfully!');
-      onClose();
+      onUploadSuccess(receiptUrl);
+      
+      // Reset state
+      setSelectedFile(null);
+      setPreviewUrl(null);
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Failed to upload receipt. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to upload receipt';
+      toast.error(errorMessage);
+      onUploadError?.(errorMessage);
     } finally {
-      setUploading(false);
+      setIsUploading(false);
     }
   };
 
-  const removeFile = () => {
-    setFile(null);
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
   };
 
-  if (!isOpen) return null;
+  const getFileIcon = (file: File) => {
+    if (file.type.startsWith('image/')) {
+      return <Image className="h-8 w-8 text-blue-400" />;
+    } else if (file.type === 'application/pdf') {
+      return <FileText className="h-8 w-8 text-red-400" />;
+    }
+    return <FileText className="h-8 w-8 text-gray-400" />;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Upload Payment Receipt</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+    <div className="space-y-4">
+      {currentReceiptUrl ? (
+        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+          <div className="flex items-center space-x-3">
+            <CheckCircle className="h-5 w-5 text-green-400" />
+            <div>
+              <p className="text-green-400 font-medium">Receipt Already Uploaded</p>
+              <p className="text-gray-400 text-sm">Your payment receipt has been submitted</p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Upload Area */}
+          <div
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+              dragActive
+                ? 'border-cyan-400 bg-cyan-400/10'
+                : 'border-gray-600 hover:border-gray-500'
+            }`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
           >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="mb-4">
-          <p className="text-sm text-gray-300 mb-2">Event: {eventTitle}</p>
-          <p className="text-sm text-gray-300 mb-2">Amount: ₹{amount}</p>
-          <p className="text-sm text-gray-300">Participant ID: {participantId}</p>
-        </div>
-
-        <div
-          className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-            dragActive
-              ? 'border-cyan-400 bg-cyan-400/10'
-              : file
-              ? 'border-green-400 bg-green-400/10'
-              : 'border-gray-600 hover:border-gray-500'
-          }`}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-        >
-          {file ? (
-            <div className="space-y-3">
-              <CheckCircle className="h-12 w-12 mx-auto text-green-400" />
+            <input
+              type="file"
+              id="receipt-upload"
+              className="hidden"
+              accept="image/*,.pdf"
+              onChange={handleFileInput}
+            />
+            
+            {!selectedFile ? (
               <div>
-                <p className="text-white font-medium">{file.name}</p>
-                <p className="text-sm text-gray-400">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-white font-medium mb-2">Upload Payment Receipt</p>
+                <p className="text-gray-400 text-sm mb-4">
+                  Drag and drop your receipt here, or click to browse
+                </p>
+                <label
+                  htmlFor="receipt-upload"
+                  className="btn-primary cursor-pointer inline-block"
+                >
+                  Choose File
+                </label>
+                <p className="text-gray-500 text-xs mt-2">
+                  Supported formats: JPG, PNG, WebP, PDF (Max 5MB)
                 </p>
               </div>
-              <button
-                onClick={removeFile}
-                className="text-red-400 hover:text-red-300 text-sm"
-              >
-                Remove file
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <Upload className="h-12 w-12 mx-auto text-gray-400" />
-              <div>
-                <p className="text-white font-medium">Upload Payment Receipt</p>
-                <p className="text-sm text-gray-400">
-                  Drag and drop or click to select
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  JPG, PNG, WebP, PDF (max 5MB)
-                </p>
-              </div>
-              <input
-                type="file"
-                onChange={handleFileSelect}
-                accept=".jpg,.jpeg,.png,.webp,.pdf"
-                className="hidden"
-                id="receipt-upload"
-              />
-              <label
-                htmlFor="receipt-upload"
-                className="inline-block px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 cursor-pointer transition-colors"
-              >
-                Choose File
-              </label>
-            </div>
-          )}
-        </div>
-
-        <div className="flex space-x-3 mt-6">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-            disabled={uploading}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleUpload}
-            disabled={!file || uploading}
-            className="flex-1 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
-          >
-            {uploading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Uploading...
-              </>
             ) : (
-              'Upload Receipt'
+              <div className="space-y-4">
+                <div className="flex items-center justify-center space-x-3">
+                  {getFileIcon(selectedFile)}
+                  <div className="text-left">
+                    <p className="text-white font-medium">{selectedFile.name}</p>
+                    <p className="text-gray-400 text-sm">{formatFileSize(selectedFile.size)}</p>
+                  </div>
+                  <button
+                    onClick={handleRemoveFile}
+                    className="p-1 hover:bg-gray-700 rounded transition-colors"
+                  >
+                    <X className="h-4 w-4 text-gray-400" />
+                  </button>
+                </div>
+
+                {previewUrl && (
+                  <div className="max-w-xs mx-auto">
+                    <img
+                      src={previewUrl}
+                      alt="Receipt preview"
+                      className="w-full h-32 object-cover rounded border border-gray-600"
+                    />
+                  </div>
+                )}
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={handleUpload}
+                    disabled={isUploading}
+                    className="btn-primary disabled:opacity-50"
+                  >
+                    {isUploading ? 'Uploading...' : 'Upload Receipt'}
+                  </button>
+                  <button
+                    onClick={handleRemoveFile}
+                    className="btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             )}
-          </button>
-        </div>
-      </div>
+          </div>
+
+          {/* Instructions */}
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
+              <div className="text-sm">
+                <p className="text-blue-400 font-medium mb-1">Receipt Upload Instructions:</p>
+                <ul className="text-gray-300 space-y-1">
+                  <li>• Take a clear photo of your payment receipt</li>
+                  <li>• Ensure the transaction ID and amount are visible</li>
+                  <li>• Upload within 24 hours of payment</li>
+                  <li>• Your payment will be verified after receipt review</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

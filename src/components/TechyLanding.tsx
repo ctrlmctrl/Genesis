@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Users, Sparkles, Zap, User, MapPin, DollarSign } from 'lucide-react';
+import { Calendar, Users, Sparkles, Zap, User, MapPin, DollarSign, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Event, Participant } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,7 +13,7 @@ interface TechyLandingProps {
 }
 
 const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loading }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -37,6 +37,10 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
 
   const availableEvents = getAvailableEvents();
 
+  // Group events by day
+  const day1Events = availableEvents.filter(event => event.eventDay === 'day1');
+  const day2Events = availableEvents.filter(event => event.eventDay === 'day2');
+
   return (
     <div className="min-h-screen tech-bg">
       {/* Animated Background Elements */}
@@ -47,6 +51,24 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
       </div>
 
       <div className="relative z-10 mobile-container">
+        {/* Logout Button - Only show when authenticated */}
+        {isAuthenticated && (
+          <motion.div
+            className="flex justify-end mb-4"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <button
+              onClick={logout}
+              className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </button>
+          </motion.div>
+        )}
+
         {/* Header */}
         <motion.div
           className="text-center mb-12"
@@ -69,7 +91,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5, duration: 0.8 }}
           >
-            Next-Generation Event Management Platform
+            Beyond Excellence
           </motion.p>
           
           {!isAuthenticated ? (
@@ -157,14 +179,14 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
             </h2>
             <div className="space-y-3">
               <p className="text-lg text-gray-300">
-                <strong className="text-cyan-400">Genesis Tech Fest 2024</strong>
+                <strong className="text-cyan-400">Genesis Tech Fest 2025</strong>
               </p>
               <p className="text-gray-400">
-                November 13-14, 2024
+                November 14-15, 2025
               </p>
               <div className="mt-4">
                 <a 
-                  href="https://share.google/PZps8siI8yeIwYHm2" 
+                  href="https://maps.app.goo.gl/jEfDLpDuZxfNpzNu8" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="inline-flex items-center px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-medium rounded-lg transition-colors duration-200"
@@ -179,20 +201,11 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
 
         {/* Events Section */}
         <motion.div
-          className="space-y-6"
+          className="space-y-12"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2, duration: 0.8 }}
         >
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-white mb-4 flex items-center justify-center">
-              <Calendar className="h-8 w-8 mr-3 text-cyan-400" />
-              Upcoming Events
-            </h2>
-            <div className="w-24 h-1 bg-gradient-to-r from-cyan-500 to-blue-500 mx-auto rounded-full"></div>
-            
-          </div>
-          
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <motion.div
@@ -217,13 +230,32 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
               </p>
             </div>
           ) : (
-            availableEvents.map((event, index) => (
+            <>
+              {/* Day 1 Events Section */}
+              {day1Events.length > 0 && (
+                <motion.div
+                  className="space-y-6"
+                  initial={{ opacity: 0, y: 50 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.4, duration: 0.8 }}
+                >
+                  <div className="text-center mb-8">
+                    <h2 className="text-3xl font-bold text-white mb-4 flex items-center justify-center">
+                      <Calendar className="h-8 w-8 mr-3 text-cyan-400" />
+                      Day 1 Events
+                    </h2>
+                    <p className="text-lg text-cyan-300 mb-4">From strategy to success</p>
+                    <p className="text-gray-400 mb-6">Begin your Genesis experience with exciting workshops and competitions</p>
+                    <div className="w-24 h-1 bg-gradient-to-r from-cyan-500 to-blue-500 mx-auto rounded-full"></div>
+                  </div>
+                  
+                  {day1Events.map((event, index) => (
               <motion.div
                 key={event.id}
                 className="card-glow hover:scale-105 transition-all duration-300 group"
                 initial={{ opacity: 0, y: 50 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.4 + index * 0.1, duration: 0.5 }}
+                      transition={{ delay: 1.6 + index * 0.1, duration: 0.5 }}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
@@ -232,9 +264,9 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                     </h3>
                     <p className="text-gray-300 mb-4">{event.description}</p>
                   </div>
-                  <div className="flex items-center text-blue-400 ml-4">
+                        <div className="flex items-center text-cyan-400 ml-4">
                     <Calendar className="h-5 w-5 mr-1" />
-                    <span className="text-sm font-medium">{event.eventDay === 'day1' ? 'Day 1' : 'Day 2'}</span>
+                          <span className="text-sm font-medium">Day 1</span>
                   </div>
                 </div>
                 
@@ -266,7 +298,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                   {event.isTeamEvent && (
                     <div className="flex items-center text-purple-400">
                       <Users className="h-4 w-4 mr-3" />
-                      Team Event ({event.membersPerTeam || event.teamSize} members{event.maxTeams ? `, max ${event.maxTeams} teams` : ''})
+                      Team Event ({event.membersPerTeam} members)
                     </div>
                   )}
                 </div>
@@ -293,7 +325,108 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                   </div>
                 </div>
               </motion.div>
-            ))
+                  ))}
+                </motion.div>
+              )}
+
+              {/* Day 2 Events Section */}
+              {day2Events.length > 0 && (
+                <motion.div
+                  className="space-y-6"
+                  initial={{ opacity: 0, y: 50 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.8, duration: 0.8 }}
+                >
+                  <div className="text-center mb-8">
+                    <h2 className="text-3xl font-bold text-white mb-4 flex items-center justify-center">
+                      <Calendar className="h-8 w-8 mr-3 text-purple-400" />
+                      Day 2 Events
+                    </h2>
+                    <p className="text-lg text-purple-300 mb-4">From code to creation</p>
+                    <p className="text-gray-400 mb-6">Continue your journey with advanced challenges and grand finale competitions</p>
+                    <div className="w-24 h-1 bg-gradient-to-r from-purple-500 to-pink-500 mx-auto rounded-full"></div>
+                  </div>
+                  
+                  {day2Events.map((event, index) => (
+                    <motion.div
+                      key={event.id}
+                      className="card-glow hover:scale-105 transition-all duration-300 group"
+                      initial={{ opacity: 0, y: 50 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 2.0 + index * 0.1, duration: 0.5 }}
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-purple-300 transition-colors">
+                            {event.title}
+                          </h3>
+                          <p className="text-gray-300 mb-4">{event.description}</p>
+                        </div>
+                        <div className="flex items-center text-purple-400 ml-4">
+                          <Calendar className="h-5 w-5 mr-1" />
+                          <span className="text-sm font-medium">Day 2</span>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3 mb-6">
+                        <div className="flex items-center text-gray-400">
+                          <Calendar className="h-4 w-4 mr-3 text-purple-400" />
+                          {new Date(event.date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </div>
+                        
+                        {event.roomNo && (
+                          <div className="flex items-center text-gray-400">
+                            <MapPin className="h-4 w-4 mr-3 text-purple-400" />
+                            Room: {event.roomNo}
+                          </div>
+                        )}
+                        
+                        {event.entryFee > 0 && (
+                          <div className="flex items-center text-purple-400">
+                            <DollarSign className="h-4 w-4 mr-3" />
+                            Entry Fee: ₹{event.entryFee}
+                          </div>
+                        )}
+                        
+                        {event.isTeamEvent && (
+                          <div className="flex items-center text-purple-400">
+                            <Users className="h-4 w-4 mr-3" />
+                            Team Event ({event.membersPerTeam} members)
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center text-sm text-purple-400">
+                          <div className="w-2 h-2 bg-purple-400 rounded-full mr-2 animate-pulse"></div>
+                          Registration Open
+                        </div>
+                        
+                        <div className="flex items-center space-x-3">
+                          {isAuthenticated ? (
+                            <Link
+                              to={`/register/${event.id}`}
+                              className="btn-primary"
+                            >
+                              Register Now
+                            </Link>
+                        ) : (
+                          <div className="text-sm text-gray-400">
+                            Sign in required
+                          </div>
+                        )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </>
           )}
         </motion.div>
       </div>

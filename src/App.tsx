@@ -12,6 +12,7 @@ import ParticipantDashboard from './pages/ParticipantDashboard';
 import AdminPage from './pages/AdminPage';
 import EventDetails from './pages/EventDetails';
 import EventParticipants from './pages/EventParticipants';
+import PaymentTracking from './pages/PaymentTracking';
 import { dataService } from './services/dataService';
 import { realtimeService } from './services/realtimeService';
 
@@ -53,6 +54,7 @@ function App() {
             <Route path="/vol/analytics" element={<VolunteerAnalytics />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/events/:eventId" element={<EventDetails />} />
+            <Route path="/admin/payments" element={<PaymentTracking />} />
             <Route path="/event/:eventId/participants" element={<EventParticipants />} />
           </Routes>
         </div>

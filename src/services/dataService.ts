@@ -1,6 +1,7 @@
 import { Event, Participant, ParticipantInfo, VerificationRecord } from '../types';
 import { localStorageService } from './localStorageService';
 import { QRCodeService } from './qrCodeService';
+import { emailService } from './emailService';
 import { 
   collection, 
   doc, 
@@ -8,9 +9,9 @@ import {
   getDocs, 
   getDoc, 
   updateDoc,
-  deleteDoc,
-  query, 
-  where
+  query,
+  where,
+  deleteDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -77,15 +78,13 @@ class DataService {
           description: 'A summit for the brightest minds in technology to share ideas and innovations.',
           date: '2025-03-15',
           time: '09:00',
-          location: 'Convention Center Hall A',
+          location: 'https://maps.app.goo.gl/jEfDLpDuZxfNpzNu8',
           currentParticipants: 0,
-          maxTeams: 50,
           isActive: true,
           entryFee: 1500,
           paymentMethod: 'online' as const,
           upiId: 'techsummit@upi',
           isTeamEvent: false,
-          teamSize: 1,
           registrationStartDate: '2025-02-01',
           registrationStartTime: '00:00',
           registrationEndDate: '2025-03-10',
@@ -97,15 +96,13 @@ class DataService {
           description: 'An intense 24-hour hackathon challenging developers to build innovative solutions.',
           date: '2025-04-22',
           time: '10:00',
-          location: 'University Auditorium',
+          location: 'https://maps.app.goo.gl/jEfDLpDuZxfNpzNu8',
           currentParticipants: 0,
           isActive: true,
           entryFee: 500,
           paymentMethod: 'both' as const,
           upiId: 'codefest@upi',
           isTeamEvent: true,
-          teamSize: 4,
-          maxTeams: 30, // Maximum 30 teams allowed
           registrationStartDate: '2025-03-01',
           registrationStartTime: '00:00',
           registrationEndDate: '2025-04-15',
@@ -119,13 +116,11 @@ class DataService {
           time: '14:00',
           location: 'Online (Zoom)',
           currentParticipants: 0,
-          maxTeams: 25,
           isActive: true,
           entryFee: 750,
           paymentMethod: 'online' as const,
           upiId: 'aiml@upi',
           isTeamEvent: false,
-          teamSize: 1,
           registrationStartDate: '2025-04-01',
           registrationStartTime: '00:00',
           registrationEndDate: '2025-05-05',
@@ -280,9 +275,9 @@ class DataService {
   }
 
   // Participant Management
-  async registerParticipant(participantData: Omit<Participant, 'id' | 'registrationDate' | 'qrCode' | 'isVerified' | 'paymentStatus'>): Promise<Participant> {
+  async registerParticipant(participantData: Omit<Participant, 'id' | 'registrationDate' | 'qrCode' | 'isVerified' | 'paymentStatus'>, userRole?: string): Promise<Participant> {
     if (this.useFirebase) {
-      return this.registerParticipantFirebase(participantData);
+      return this.registerParticipantFirebase(participantData, userRole);
     }
 
     const event = this.events.find(e => e.id === participantData.eventId);
@@ -294,13 +289,12 @@ class DataService {
       throw new Error('Event is not active');
     }
 
-    // Check team limits for team events
-    if (event.isTeamEvent && event.maxTeams) {
-      const currentTeams = await this.getCurrentTeamCount(participantData.eventId);
-      if (currentTeams >= event.maxTeams) {
-        throw new Error('Maximum number of teams reached for this event');
-      }
+    // Check registration controls
+    const registrationStatus = this.checkRegistrationAvailability(event, userRole);
+    if (!registrationStatus.allowed) {
+      throw new Error(registrationStatus.reason);
     }
+
 
     if (event.isTeamEvent) {
       throw new Error('This is a team event. Please use team registration.');
@@ -328,7 +322,7 @@ class DataService {
     return participant;
   }
 
-  private async registerParticipantFirebase(participantData: Omit<Participant, 'id' | 'registrationDate' | 'qrCode' | 'isVerified' | 'paymentStatus'>): Promise<Participant> {
+  private async registerParticipantFirebase(participantData: Omit<Participant, 'id' | 'registrationDate' | 'qrCode' | 'isVerified' | 'paymentStatus'>, userRole?: string): Promise<Participant> {
     try {
       // Check if event exists and is active
       const event = await this.getEvent(participantData.eventId);
@@ -340,13 +334,12 @@ class DataService {
         throw new Error('Event is not active');
       }
 
-      // Check team limits for team events
-      if (event.isTeamEvent && event.maxTeams) {
-        const currentTeams = await this.getCurrentTeamCount(participantData.eventId);
-        if (currentTeams >= event.maxTeams) {
-          throw new Error('Maximum number of teams reached for this event');
-        }
+      // Check registration controls
+      const registrationStatus = this.checkRegistrationAvailability(event, userRole);
+      if (!registrationStatus.allowed) {
+        throw new Error(registrationStatus.reason);
       }
+
 
       if (event.isTeamEvent) {
         throw new Error('This is a team event. Please use team registration.');
@@ -373,17 +366,21 @@ class DataService {
         email: participantDoc.email,
         phone: participantDoc.phone,
         college: participantDoc.college,
+        standard: participantDoc.standard,
+        stream: participantDoc.stream,
         registrationDate: participantDoc.registrationDate,
         qrCode: participantDoc.qrCode,
         isVerified: participantDoc.isVerified,
         paymentStatus: participantDoc.paymentStatus,
         paymentMethod: participantDoc.paymentMethod,
-        paymentId: participantDoc.paymentId,
         receiptUrl: participantDoc.receiptUrl,
         verificationTime: participantDoc.verificationTime,
         teamId: participantDoc.teamId,
         teamName: participantDoc.teamName,
-        isTeamLead: participantDoc.isTeamLead
+        isTeamLead: participantDoc.isTeamLead,
+        registrationType: participantDoc.registrationType,
+        entryFeePaid: participantDoc.entryFeePaid,
+        assignedRoom: participantDoc.assignedRoom
       };
 
       // Update event participant count
@@ -479,6 +476,23 @@ class DataService {
     return this.participants.filter(p => p.eventId === eventId);
   }
 
+  async getParticipantsByEmail(email: string): Promise<Participant[]> {
+    if (this.useFirebase) {
+      try {
+        const q = query(collection(db, 'participants'), where('email', '==', email));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Participant[];
+      } catch (error) {
+        console.error('Error getting participants by email from Firebase:', error);
+        return [];
+      }
+    }
+    return this.participants.filter(p => p.email === email);
+  }
+
   async getParticipantsByEventCount(eventId: string): Promise<number> {
     const participants = await this.getParticipantsByEvent(eventId);
     return participants.length;
@@ -504,7 +518,7 @@ class DataService {
       throw new Error('This is not a team event');
     }
 
-    const requiredMembers = event.membersPerTeam || event.teamSize || 1;
+    const requiredMembers = event.membersPerTeam || 1;
     if (teamMembers.length !== requiredMembers) {
       throw new Error(`Team must have exactly ${requiredMembers} members`);
     }
@@ -524,6 +538,8 @@ class DataService {
         email: member.email,
         phone: member.phone,
         college: member.college,
+        standard: member.standard,
+        stream: member.stream,
         registrationDate: new Date().toISOString(),
         qrCode: uniqueQRCode,
         isVerified: false,
@@ -557,7 +573,7 @@ class DataService {
         throw new Error('This is not a team event');
       }
 
-    const requiredMembers = event.membersPerTeam || event.teamSize || 1;
+    const requiredMembers = event.membersPerTeam || 1;
     if (teamMembers.length !== requiredMembers) {
       throw new Error(`Team must have exactly ${requiredMembers} members`);
     }
@@ -575,6 +591,8 @@ class DataService {
           email: member.email,
           phone: member.phone,
           college: member.college,
+          standard: member.standard,
+          stream: member.stream,
           registrationDate: new Date().toISOString(),
           qrCode: uniqueQRCode,
           isVerified: false,
@@ -595,13 +613,18 @@ class DataService {
           email: participantDoc.email,
           phone: participantDoc.phone,
           college: participantDoc.college,
+          standard: participantDoc.standard,
+          stream: participantDoc.stream,
           registrationDate: participantDoc.registrationDate,
           qrCode: participantDoc.qrCode,
           isVerified: participantDoc.isVerified,
           paymentStatus: participantDoc.paymentStatus,
           teamId: participantDoc.teamId,
           teamName: participantDoc.teamName,
-          isTeamLead: participantDoc.isTeamLead
+          isTeamLead: participantDoc.isTeamLead,
+          // registrationType: participantDoc.registrationType,
+          // entryFeePaid: participantDoc.entryFeePaid,
+          // assignedRoom: participantDoc.assignedRoom
         };
 
         registeredMembers.push(participant);
@@ -632,17 +655,160 @@ class DataService {
     return this.participants[participantIndex];
   }
 
-  async updatePaymentStatus(participantId: string, paymentStatus: 'pending' | 'paid' | 'offline_paid', paymentMethod?: 'online' | 'offline', paymentId?: string, receiptUrl?: string): Promise<Participant | null> {
+  async updatePaymentStatus(participantId: string, paymentStatus: 'pending' | 'paid' | 'offline_paid' | 'failed', paymentMethod?: 'online' | 'offline', receiptUrl?: string): Promise<Participant | null> {
+    if (this.useFirebase) {
+      return this.updatePaymentStatusFirebase(participantId, paymentStatus, paymentMethod, receiptUrl);
+    }
+
     const participantIndex = this.participants.findIndex(p => p.id === participantId);
     if (participantIndex === -1) return null;
 
+    const oldStatus = this.participants[participantIndex].paymentStatus;
     this.participants[participantIndex].paymentStatus = paymentStatus;
     if (paymentMethod) this.participants[participantIndex].paymentMethod = paymentMethod;
-    if (paymentId) this.participants[participantIndex].paymentId = paymentId;
     if (receiptUrl) this.participants[participantIndex].receiptUrl = receiptUrl;
 
+    // Send email notification if status changed to verified or failed
+    if (oldStatus !== paymentStatus && (paymentStatus === 'paid' || paymentStatus === 'offline_paid' || paymentStatus === 'failed')) {
+      await this.sendPaymentNotification(this.participants[participantIndex]);
+    }
+
+    this.saveDataToStorage();
     return this.participants[participantIndex];
   }
+
+  private async updatePaymentStatusFirebase(participantId: string, paymentStatus: 'pending' | 'paid' | 'offline_paid' | 'failed', paymentMethod?: 'online' | 'offline', receiptUrl?: string): Promise<Participant | null> {
+    try {
+      const participantRef = doc(db, 'participants', participantId);
+      const participantDoc = await getDoc(participantRef);
+      
+      if (!participantDoc.exists()) {
+        return null;
+      }
+      
+      const participantData = participantDoc.data() as Participant;
+      const oldStatus = participantData.paymentStatus;
+
+      const updateData: any = {
+        paymentStatus,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (paymentMethod) updateData.paymentMethod = paymentMethod;
+      if (receiptUrl) updateData.receiptUrl = receiptUrl;
+
+      await updateDoc(participantRef, updateData);
+
+      // Send email notification if status changed to verified or failed
+      if (oldStatus !== paymentStatus && (paymentStatus === 'paid' || paymentStatus === 'offline_paid' || paymentStatus === 'failed')) {
+        const updatedParticipant = { ...participantData, ...updateData };
+        await this.sendPaymentNotification(updatedParticipant);
+      }
+
+      return { ...participantData, ...updateData };
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      return null;
+    }
+  }
+
+  private async sendPaymentNotification(participant: Participant): Promise<void> {
+    try {
+      // Get event details
+      const event = await this.getEvent(participant.eventId);
+      if (!event) return;
+
+      // Get team lead email if this is a team event
+      let teamLeadEmail: string | undefined;
+      if (participant.teamId) {
+        const teamMembers = this.participants.filter(p => p.teamId === participant.teamId);
+        const teamLead = teamMembers.find(p => p.isTeamLead);
+        if (teamLead) {
+          teamLeadEmail = teamLead.email;
+        }
+      }
+
+      await emailService.sendPaymentNotification({
+        participantName: participant.fullName,
+        eventTitle: event.title,
+        paymentStatus: participant.paymentStatus as 'paid' | 'offline_paid' | 'failed',
+        paymentMethod: participant.paymentMethod,
+        amount: participant.entryFeePaid,
+        teamName: participant.teamName,
+        isTeamLead: participant.isTeamLead,
+        participantEmail: participant.email,
+        teamLeadEmail: teamLeadEmail
+      });
+    } catch (error) {
+      console.error('Error sending payment notification:', error);
+    }
+  }
+
+  // Registration Control Validation
+  private checkRegistrationAvailability(event: Event, userRole?: string): { allowed: boolean; reason: string } {
+    const now = new Date();
+    
+    // Check day-wise controls first
+    if (event.dayWiseControls) {
+      const dayControl = event.dayWiseControls[event.eventDay];
+      if (dayControl && !dayControl.allowRegistration) {
+        return {
+          allowed: false,
+          reason: `Registration is currently closed for ${event.eventDay} events`
+        };
+      }
+      
+      if (dayControl?.registrationEndDate && dayControl?.registrationEndTime) {
+        const endDateTime = new Date(`${dayControl.registrationEndDate}T${dayControl.registrationEndTime}`);
+        if (now > endDateTime && !dayControl.allowLateRegistration) {
+          return {
+            allowed: false,
+            reason: `Registration deadline for ${event.eventDay} events has passed`
+          };
+        }
+      }
+    }
+    
+    // Check event-specific registration deadline
+    if (event.registrationEndDate && event.registrationEndTime) {
+      const endDateTime = new Date(`${event.registrationEndDate}T${event.registrationEndTime}`);
+      if (now > endDateTime) {
+        // Check if late registration is allowed
+        if (event.registrationControls?.allowAfterDeadline) {
+          return { allowed: true, reason: 'Late registration allowed' };
+        }
+        
+        // Check role-based permissions
+        if (userRole === 'admin' && event.registrationControls?.allowAfterDeadlineForAdmins) {
+          return { allowed: true, reason: 'Admin late registration allowed' };
+        }
+        
+        if (userRole === 'volunteer' && event.registrationControls?.allowAfterDeadlineForVolunteers) {
+          return { allowed: true, reason: 'Volunteer late registration allowed' };
+        }
+        
+        return {
+          allowed: false,
+          reason: 'Registration deadline has passed'
+        };
+      }
+    }
+    
+    // Check if registration is within allowed time window
+    if (event.registrationStartDate && event.registrationStartTime) {
+      const startDateTime = new Date(`${event.registrationStartDate}T${event.registrationStartTime}`);
+      if (now < startDateTime) {
+        return {
+          allowed: false,
+          reason: 'Registration has not started yet'
+        };
+      }
+    }
+    
+    return { allowed: true, reason: 'Registration is available' };
+  }
+
+
 
   // QR Code Verification
   async verifyParticipant(participantId: string, volunteerId: string, assignedRoom?: string): Promise<boolean> {
@@ -768,8 +934,6 @@ class DataService {
       paymentMethod: 'both',
       upiId: 'hackathon@upi',
       isTeamEvent: true,
-      teamSize: 4,
-      maxTeams: 25, // Maximum 25 teams allowed
       eventDay: 'day2',
       membersPerTeam: 4,
       registrationStartDate: '2024-10-15',

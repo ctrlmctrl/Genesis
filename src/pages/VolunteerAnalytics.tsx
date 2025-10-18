@@ -203,7 +203,7 @@ const VolunteerAnalytics: React.FC = () => {
                   <h3 className="text-lg font-semibold text-white">{event.title}</h3>
                   <span className="text-sm text-gray-400">
                     {event.isTeamEvent 
-                      ? `${Math.ceil(eventParticipants.length / (event.teamSize || 1))} teams (${eventParticipants.length} members)${event.maxTeams ? ` / ${event.maxTeams} max teams` : ''}`
+                      ? `${Math.ceil(eventParticipants.length / (event.membersPerTeam || 1))} teams (${eventParticipants.length} members)`
                       : `${eventParticipants.length} participants`
                     }
                   </span>

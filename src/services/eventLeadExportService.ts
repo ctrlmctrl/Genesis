@@ -14,6 +14,8 @@ class EventLeadExportService {
       'Email',
       'Phone',
       'College/Institution',
+      'Standard/Year',
+      'Stream/Branch',
       'Registration Date',
       'Payment Status',
       'Payment Method',
@@ -44,6 +46,8 @@ class EventLeadExportService {
         participant.email,
         participant.phone,
         participant.college,
+        participant.standard,
+        participant.stream,
         new Date(participant.registrationDate).toLocaleDateString(),
         participant.paymentStatus === 'paid' ? 'Paid' :
         participant.paymentStatus === 'offline_paid' ? 'Offline Paid' : 'Pending',
@@ -84,7 +88,7 @@ class EventLeadExportService {
     eventSheet.addRow(['Paid Participants', participants.filter(p => p.paymentStatus === 'paid' || p.paymentStatus === 'offline_paid').length]);
     eventSheet.addRow(['Team Event', event.isTeamEvent ? 'Yes' : 'No']);
     if (event.isTeamEvent) {
-      eventSheet.addRow(['Team Size', event.teamSize || 'N/A']);
+      eventSheet.addRow(['Team Size', event.membersPerTeam || 'N/A']);
       const uniqueTeams = new Set(participants.filter(p => p.teamName).map(p => p.teamName));
       eventSheet.addRow(['Number of Teams', uniqueTeams.size]);
     }
@@ -138,7 +142,7 @@ class EventLeadExportService {
       rowIndex++;
 
       // Team member headers
-      const memberHeaders = ['Name', 'Email', 'Phone', 'College', 'Team Lead', 'Payment Status', 'Verification Status'];
+      const memberHeaders = ['Name', 'Email', 'Phone', 'College', 'Standard', 'Stream', 'Team Lead', 'Payment Status', 'Verification Status'];
       worksheet.addRow(memberHeaders);
       const memberHeaderRow = worksheet.getRow(rowIndex);
       memberHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -156,6 +160,8 @@ class EventLeadExportService {
           member.email,
           member.phone,
           member.college,
+          member.standard,
+          member.stream,
           member.isTeamLead ? 'Yes' : 'No',
           member.paymentStatus === 'paid' ? 'Paid' :
           member.paymentStatus === 'offline_paid' ? 'Offline Paid' : 'Pending',

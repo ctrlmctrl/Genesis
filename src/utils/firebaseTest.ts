@@ -28,7 +28,7 @@ export const testFirebaseWrite = async (): Promise<boolean> => {
       description: 'This is a test event to verify Firebase write permissions',
       date: '2025-01-01',
       time: '12:00',
-      location: 'Test Location',
+      location: 'https://maps.app.goo.gl/jEfDLpDuZxfNpzNu8',
       currentParticipants: 0,
       isActive: true,
       entryFee: 0,

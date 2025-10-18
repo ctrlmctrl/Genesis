@@ -8,8 +8,11 @@ import toast from 'react-hot-toast';
 
 interface TeamMember {
   fullName: string;
+  email: string;
   phone: string;
   college: string;
+  standard: 'FY' | 'SY' | 'TY' | '11' | '12';
+  stream: string;
 }
 
 interface TeamRegistrationFormProps {
@@ -24,12 +27,15 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(() => {
     // Initialize with required number of team members
     const members: TeamMember[] = [];
-    const memberCount = event.membersPerTeam || event.teamSize || 1;
+    const memberCount = event.membersPerTeam || 1;
     for (let i = 0; i < memberCount; i++) {
       members.push({
         fullName: '',
+        email: i === 0 ? (user?.email || '') : '', // Team lead gets user's email, others start empty
         phone: '',
         college: '',
+        standard: 'FY',
+        stream: '',
       });
     }
     return members;
@@ -45,6 +51,14 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
     setTeamMembers(updatedMembers);
   };
 
+  const validateName = (name: string): boolean => {
+    return /^[A-Z][a-zA-Z\s]*$/.test(name);
+  };
+
+  const validatePhone = (phone: string): boolean => {
+    return /^[6-9]\d{9}$/.test(phone);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -56,18 +70,45 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
     // Validate all team members
     for (let i = 0; i < teamMembers.length; i++) {
       const member = teamMembers[i];
-      if (!member.fullName.trim() || !member.phone.trim() || !member.college.trim()) {
+      const isTeamLead = i === 0;
+      
+      // Check required fields (email is optional for team lead, required for others)
+      if (!member.fullName.trim() || !member.phone.trim() || !member.college.trim() || !member.standard || !member.stream.trim()) {
         toast.error(`Please fill all details for team member ${i + 1}`);
+        return;
+      }
+      
+      // Email validation: required for non-team-lead members
+      if (!isTeamLead && !member.email.trim()) {
+        toast.error(`Email is required for team member ${i + 1}`);
+        return;
+      }
+      
+      // Email format validation for non-team-lead members
+      if (!isTeamLead && member.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(member.email)) {
+        toast.error(`Please enter a valid email for team member ${i + 1}`);
+        return;
+      }
+      
+      // Validate name format
+      if (!validateName(member.fullName)) {
+        toast.error(`Name for team member ${i + 1} must start with a capital letter`);
+        return;
+      }
+      
+      // Validate phone format
+      if (!validatePhone(member.phone)) {
+        toast.error(`Phone number for team member ${i + 1} must be 10 digits starting with 6, 7, 8, or 9`);
         return;
       }
     }
 
     setLoading(true);
     try {
-      // Add email from authenticated user to each team member
-      const teamMembersWithEmail = teamMembers.map(member => ({
+      // Prepare team members with proper email handling
+      const teamMembersWithEmail = teamMembers.map((member, index) => ({
         ...member,
-        email: user?.email || ''
+        email: index === 0 ? (user?.email || '') : member.email // Team lead uses authenticated user's email
       }));
       
       const participants = await dataService.registerTeam(event.id, teamName, teamMembersWithEmail);
@@ -112,7 +153,7 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
           <p className="text-gray-300 text-sm mb-2">{event.description}</p>
           <div className="flex items-center text-sm text-cyan-400">
             <Users className="h-4 w-4 mr-2" />
-            Team Size: {event.teamSize} members
+            Team Size: {event.membersPerTeam} members
           </div>
         </div>
 
@@ -165,11 +206,25 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
                         value={member.fullName}
                         onChange={(e) => handleMemberChange(index, 'fullName', e.target.value)}
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                        placeholder="Enter full name"
+                        placeholder="Enter full name (start with capital letter)"
                         required
                       />
                     </div>
 
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Email {index === 0 ? '(Auto-filled)' : '*'}
+                      </label>
+                      <input
+                        type="email"
+                        value={member.email}
+                        onChange={(e) => handleMemberChange(index, 'email', e.target.value)}
+                        className={`w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${index === 0 ? 'bg-gray-600 cursor-not-allowed' : ''}`}
+                        placeholder={index === 0 ? "Auto-filled from your account" : "Enter email address"}
+                        disabled={index === 0}
+                        required={index !== 0}
+                      />
+                    </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">
@@ -180,7 +235,7 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
                         value={member.phone}
                         onChange={(e) => handleMemberChange(index, 'phone', e.target.value)}
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                        placeholder="Enter phone number"
+                        placeholder="Enter 10-digit phone number"
                         required
                       />
                     </div>
@@ -195,6 +250,38 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
                         onChange={(e) => handleMemberChange(index, 'college', e.target.value)}
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                         placeholder="Enter college name"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Standard/Year *
+                      </label>
+                      <select
+                        value={member.standard}
+                        onChange={(e) => handleMemberChange(index, 'standard', e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="FY">First Year (FY)</option>
+                        <option value="SY">Second Year (SY)</option>
+                        <option value="TY">Third Year (TY)</option>
+                        <option value="11">11th Standard</option>
+                        <option value="12">12th Standard</option>
+                      </select>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Stream/Branch *
+                      </label>
+                      <input
+                        type="text"
+                        value={member.stream}
+                        onChange={(e) => handleMemberChange(index, 'stream', e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                        placeholder="e.g., Computer Science, Electronics, Mechanical, etc."
                         required
                       />
                     </div>

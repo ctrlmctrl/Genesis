@@ -358,7 +358,8 @@ const VolunteerScanner: React.FC = () => {
               </button>
             </div>
             
-            <div className="relative">
+            {/* Video Preview - Moved to top */}
+            <div className="relative mb-4">
               <video 
                 id="qr-reader" 
                 className="w-full max-w-md mx-auto rounded-lg"
@@ -379,7 +380,8 @@ const VolunteerScanner: React.FC = () => {
               />
             </div>
             
-            <div className="mt-4 text-center">
+            {/* Description - Moved below video */}
+            <div className="text-center">
               <p className="text-gray-400 text-sm">
                 Point your camera at a QR code to scan it
               </p>
@@ -432,6 +434,16 @@ const VolunteerScanner: React.FC = () => {
             <div>
               <label className="text-sm text-gray-400">College</label>
               <p className="text-white">{participant.college}</p>
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-400">Standard</label>
+              <p className="text-white">{participant.standard}</p>
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-400">Stream</label>
+              <p className="text-white">{participant.stream}</p>
             </div>
 
             {participant.teamName && (

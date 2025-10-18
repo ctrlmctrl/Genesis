@@ -52,18 +52,76 @@
   }
   
   .mobile-container {
-    @apply max-w-md mx-auto px-4 py-6 min-h-screen;
+    @apply max-w-md mx-auto px-6 py-8 min-h-screen;
   }
   
   @media (min-width: 768px) {
     .mobile-container {
-      @apply max-w-4xl;
+      @apply max-w-4xl px-8;
     }
   }
   
   @media (min-width: 1024px) {
     .mobile-container {
-      @apply max-w-6xl;
+      @apply max-w-6xl px-12;
+    }
+  }
+
+  /* Improve mobile spacing */
+  @media (max-width: 767px) {
+    .card {
+      @apply p-4;
+    }
+    
+    .card-glow {
+      @apply p-4;
+    }
+    
+    .btn-primary,
+    .btn-secondary {
+      @apply py-2 px-4 text-sm;
+    }
+    
+    .input-field {
+      @apply py-2 px-3 text-sm;
+    }
+    
+    /* Better mobile grid spacing */
+    .grid {
+      @apply gap-3;
+    }
+    
+    /* Mobile-specific text sizes */
+    h1 {
+      @apply text-xl;
+    }
+    
+    h2 {
+      @apply text-lg;
+    }
+    
+    h3 {
+      @apply text-base;
+    }
+    
+    /* Mobile form improvements */
+    .space-y-4 > * + * {
+      @apply mt-3;
+    }
+    
+    .space-y-6 > * + * {
+      @apply mt-4;
+    }
+    
+    /* Mobile button improvements */
+    .btn-primary,
+    .btn-secondary {
+      @apply min-h-[44px]; /* Better touch targets */
+    }
+    
+    /* Mobile table/list improvements */
+    .space-y-4 > div {
+      @apply mb-3;
     }
   }
   
@@ -131,5 +189,72 @@
 
   #qr-reader__scan_region img {
     border-radius: 12px !important;
+  }
+
+  /* Hide number input spinners */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+
+  /* Fix text visibility on dark background */
+  .text-gray-900 {
+    @apply text-white;
+  }
+  
+  .text-gray-800 {
+    @apply text-gray-200;
+  }
+  
+  .text-gray-700 {
+    @apply text-gray-300;
+  }
+  
+  .text-gray-600 {
+    @apply text-gray-400;
+  }
+
+  /* Fix card backgrounds for better contrast */
+  .bg-gray-50 {
+    @apply bg-gray-800;
+  }
+  
+  .bg-gray-100 {
+    @apply bg-gray-700;
+  }
+  
+  .bg-white {
+    @apply bg-gray-800;
+  }
+
+  /* Fix border colors */
+  .border-gray-300 {
+    @apply border-gray-600;
+  }
+  
+  .border-gray-200 {
+    @apply border-gray-700;
+  }
+
+  /* Fix hover states */
+  .hover\:bg-gray-50:hover {
+    @apply hover:bg-gray-700;
+  }
+  
+  .hover\:bg-gray-100:hover {
+    @apply hover:bg-gray-600;
+  }
+  
+  .hover\:text-gray-800:hover {
+    @apply hover:text-gray-200;
+  }
+  
+  .hover\:text-gray-900:hover {
+    @apply hover:text-white;
   }
 }

@@ -18,6 +18,8 @@ interface OfflineRegistrationForm {
   email: string;
   phone: string;
   college: string;
+  standard: 'FY' | 'SY' | 'TY' | '11' | '12';
+  stream: string;
   amountPaid: number;
   receiptNumber: string;
   notes?: string;
@@ -50,6 +52,8 @@ const OfflineRegistration: React.FC<OfflineRegistrationProps> = ({
         email: data.email,
         phone: data.phone,
         college: data.college,
+        standard: data.standard,
+        stream: data.stream,
       });
 
       // Update payment status for offline payment
@@ -57,7 +61,6 @@ const OfflineRegistration: React.FC<OfflineRegistrationProps> = ({
         participant.id,
         'offline_paid',
         'offline',
-        data.receiptNumber,
         receiptFile ? URL.createObjectURL(receiptFile) : undefined
       );
 
@@ -136,7 +139,13 @@ const OfflineRegistration: React.FC<OfflineRegistrationProps> = ({
                 </label>
                 <input
                   type="text"
-                  {...register('fullName', { required: 'Full name is required' })}
+                  {...register('fullName', { 
+                    required: 'Full name is required',
+                    pattern: {
+                      value: /^[A-Z][a-zA-Z\s]*$/,
+                      message: 'Name must start with a capital letter'
+                    }
+                  })}
                   className="input-field"
                   placeholder="Enter full name"
                 />
@@ -177,12 +186,12 @@ const OfflineRegistration: React.FC<OfflineRegistrationProps> = ({
                   {...register('phone', { 
                     required: 'Phone number is required',
                     pattern: {
-                      value: /^[+]?[1-9][\d]{0,15}$/,
-                      message: 'Invalid phone number'
+                      value: /^[6-9]\d{9}$/,
+                      message: 'Phone number must be 10 digits starting with 6, 7, 8, or 9'
                     }
                   })}
                   className="input-field"
-                  placeholder="Enter phone number"
+                  placeholder="Enter 10-digit phone number"
                 />
                 {errors.phone && (
                   <p className="text-red-400 text-sm mt-1">{errors.phone.message}</p>
@@ -202,6 +211,41 @@ const OfflineRegistration: React.FC<OfflineRegistrationProps> = ({
               />
               {errors.college && (
                 <p className="text-red-400 text-sm mt-1">{errors.college.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Standard/Year *
+              </label>
+              <select
+                {...register('standard', { required: 'Standard/Year is required' })}
+                className="input-field"
+              >
+                <option value="">Select your standard/year</option>
+                <option value="FY">First Year (FY)</option>
+                <option value="SY">Second Year (SY)</option>
+                <option value="TY">Third Year (TY)</option>
+                <option value="11">11th Standard</option>
+                <option value="12">12th Standard</option>
+              </select>
+              {errors.standard && (
+                <p className="text-red-400 text-sm mt-1">{errors.standard.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Stream/Branch *
+              </label>
+              <input
+                type="text"
+                {...register('stream', { required: 'Stream/Branch is required' })}
+                className="input-field"
+                placeholder="e.g., Computer Science, Electronics, Mechanical, etc."
+              />
+              {errors.stream && (
+                <p className="text-red-400 text-sm mt-1">{errors.stream.message}</p>
               )}
             </div>
 

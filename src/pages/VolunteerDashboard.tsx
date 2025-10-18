@@ -57,7 +57,7 @@ const VolunteerDashboard: React.FC = () => {
   const handleLogout = () => {
     roleAuthService.logout();
     setUser(null);
-    navigate('/');
+    navigate('/volunteer');
   };
 
   if (loading) {

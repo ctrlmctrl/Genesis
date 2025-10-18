@@ -15,6 +15,8 @@ interface RegistrationForm {
   fullName: string;
   phone: string;
   college: string;
+  standard: 'FY' | 'SY' | 'TY' | '11' | '12';
+  stream: string;
 }
 
 const EventRegistration: React.FC = () => {
@@ -73,6 +75,12 @@ const EventRegistration: React.FC = () => {
   const onSubmit = async (data: RegistrationForm) => {
     if (!event || !isAuthenticated) return;
     
+    // Check if this is a team event
+    if (event.isTeamEvent) {
+      toast.error('This is a team event. Please use team registration.');
+      return;
+    }
+    
     // Check registration status before proceeding
     const status = canUserRegister(event, user?.email);
     if (!status.canRegister) {
@@ -85,16 +93,12 @@ const EventRegistration: React.FC = () => {
       // Get the appropriate entry fee for the registration type
       const entryFee = getEntryFee(event, registrationType);
       
-      // Generate unique payment identifier for UPI transaction matching
-      const paymentIdentifier = paymentService.generatePaymentIdentifier();
-      
       const participant = await dataService.registerParticipant({
         eventId: event.id,
         ...data,
         email: user?.email || '', // Get email from authenticated user
         registrationType: registrationType,
         entryFeePaid: entryFee,
-        paymentIdentifier: paymentIdentifier,
       });
 
       setParticipantId(participant.id);
@@ -115,13 +119,12 @@ const EventRegistration: React.FC = () => {
   };
 
 
-  const handlePaymentComplete = async (paymentId: string, method: 'online' | 'offline', receiptUrl?: string) => {
+  const handlePaymentComplete = async (method: 'online' | 'offline', receiptUrl?: string) => {
     try {
       await dataService.updatePaymentStatus(
         participantId,
         method === 'online' ? 'paid' : 'offline_paid',
         method,
-        paymentId,
         receiptUrl
       );
       
@@ -309,7 +312,13 @@ const EventRegistration: React.FC = () => {
             </label>
             <input
               type="text"
-              {...register('fullName', { required: 'Full name is required' })}
+              {...register('fullName', { 
+                required: 'Full name is required',
+                pattern: {
+                  value: /^[A-Z][a-zA-Z\s]*$/,
+                  message: 'Name must start with a capital letter'
+                }
+              })}
               className="input-field"
               placeholder="Enter your full name"
             />
@@ -328,12 +337,12 @@ const EventRegistration: React.FC = () => {
               {...register('phone', { 
                 required: 'Phone number is required',
                 pattern: {
-                  value: /^[+]?[1-9][\d]{0,15}$/,
-                  message: 'Invalid phone number'
+                  value: /^[6-9]\d{9}$/,
+                  message: 'Phone number must be 10 digits starting with 6, 7, 8, or 9'
                 }
               })}
               className="input-field"
-              placeholder="Enter your phone number"
+              placeholder="Enter your 10-digit phone number"
             />
             {errors.phone && (
               <p className="text-red-400 text-sm mt-1">{errors.phone.message}</p>
@@ -355,13 +364,49 @@ const EventRegistration: React.FC = () => {
             )}
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Standard/Year *
+            </label>
+            <select
+              {...register('standard', { required: 'Standard/Year is required' })}
+              className="input-field"
+            >
+              <option value="">Select your standard/year</option>
+              <option value="FY">First Year (FY)</option>
+              <option value="SY">Second Year (SY)</option>
+              <option value="TY">Third Year (TY)</option>
+              <option value="11">11th Standard</option>
+              <option value="12">12th Standard</option>
+            </select>
+            {errors.standard && (
+              <p className="text-red-400 text-sm mt-1">{errors.standard.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Stream/Branch *
+            </label>
+            <input
+              type="text"
+              {...register('stream', { required: 'Stream/Branch is required' })}
+              className="input-field"
+              placeholder="e.g., Computer Science, Electronics, Mechanical, etc."
+            />
+            {errors.stream && (
+              <p className="text-red-400 text-sm mt-1">{errors.stream.message}</p>
+            )}
+          </div>
+
           <div className="flex space-x-4">
             <button
               type="submit"
-              disabled={submitting || !registrationStatus.canRegister}
-              className={`btn-primary flex-1 ${!registrationStatus.canRegister ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={submitting || !registrationStatus.canRegister || event.isTeamEvent}
+              className={`btn-primary flex-1 ${(!registrationStatus.canRegister || event.isTeamEvent) ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {submitting ? 'Registering...' : 
+               event.isTeamEvent ? 'Team Event - Use Team Registration' :
                !registrationStatus.canRegister ? 'Registration Closed' : 
                registrationType === 'on_spot' ? 'Register On-the-Spot' :
                'Register for Event'}

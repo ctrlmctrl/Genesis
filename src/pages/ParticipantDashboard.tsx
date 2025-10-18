@@ -6,6 +6,8 @@ import { Event, Participant } from '../types';
 import { dataService } from '../services/dataService';
 import { realtimeService } from '../services/realtimeService';
 import { useAuth } from '../contexts/AuthContext';
+import ReceiptUpload from '../components/ReceiptUpload';
+import ReceiptReupload from '../components/ReceiptReupload';
 import toast from 'react-hot-toast';
 
 const ParticipantDashboard: React.FC = () => {
@@ -14,6 +16,8 @@ const ParticipantDashboard: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showReceiptReupload, setShowReceiptReupload] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -44,25 +48,7 @@ const ParticipantDashboard: React.FC = () => {
       setupRealtimeListeners();
     } else {
       // Fallback to regular data loading for development
-      const loadData = async () => {
-        try {
-          const [eventsData, participantsData] = await Promise.all([
-            dataService.getEvents(),
-            dataService.getParticipants()
-          ]);
-          
-          setEvents(eventsData);
-          // Filter participants for current user
-          const userParticipants = participantsData.filter((p: Participant) => p.email === user?.email);
-          setParticipants(userParticipants);
-        } catch (error) {
-          console.error('Error loading data:', error);
-          toast.error('Failed to load data');
-        } finally {
-          setLoading(false);
-        }
-      };
-      loadData();
+      loadData().finally(() => setLoading(false));
     }
 
     // Cleanup function
@@ -75,6 +61,27 @@ const ParticipantDashboard: React.FC = () => {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const loadData = async () => {
+    try {
+      const [eventsData, userParticipants] = await Promise.all([
+        dataService.getEvents(),
+        user?.email ? dataService.getParticipantsByEmail(user.email) : Promise.resolve([])
+      ]);
+      
+      setEvents(eventsData);
+      setParticipants(userParticipants);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast.error('Failed to load data');
+    }
+  };
+
+  const handleReceiptUploadSuccess = async (participantId: string, receiptUrl: string) => {
+    // Refresh the participants data to show updated payment status
+    await loadData();
+    toast.success('Receipt uploaded successfully! Payment will be verified soon.');
   };
 
   if (loading) {
@@ -132,7 +139,7 @@ const ParticipantDashboard: React.FC = () => {
             </Link>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {participants.map((participant) => {
               const event = events.find(e => e.id === participant.eventId);
 
@@ -195,6 +202,41 @@ const ParticipantDashboard: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Receipt Upload Section */}
+                  {participant.paymentStatus === 'pending' && (
+                    <div className="mb-4">
+                      <ReceiptUpload
+                        participantId={participant.id}
+                        currentReceiptUrl={participant.receiptUrl}
+                        onUploadSuccess={(receiptUrl) => handleReceiptUploadSuccess(participant.id, receiptUrl)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Failed Payment Re-upload Section */}
+                  {participant.paymentStatus === 'failed' && (
+                    <div className="mb-4">
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-4">
+                        <div className="flex items-center mb-2">
+                          <div className="h-2 w-2 bg-red-400 rounded-full mr-2"></div>
+                          <span className="text-red-400 font-medium">Payment Verification Failed</span>
+                        </div>
+                        <p className="text-sm text-red-300 mb-3">
+                          Your payment receipt could not be verified. Please upload a clear, high-quality image of your payment receipt.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setSelectedParticipant(participant);
+                            setShowReceiptReupload(true);
+                          }}
+                          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                        >
+                          Re-upload Receipt
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <Link
                     to={`/qr/${participant.id}`}
                     className="btn-primary w-full text-center flex items-center justify-center space-x-2"
@@ -232,8 +274,8 @@ const ParticipantDashboard: React.FC = () => {
           }
           
           return (
-            <div className="space-y-4">
-              {availableEvents.slice(0, 3).map((event) => (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {availableEvents.slice(0, 4).map((event) => (
               <motion.div
                 key={event.id}
                 className="card-glow hover:shadow-cyan-500/50 transition-shadow"
@@ -243,7 +285,7 @@ const ParticipantDashboard: React.FC = () => {
                   <h3 className="text-lg font-semibold text-white">{event.title}</h3>
                   <span className="text-sm text-gray-400">
                     {event.isTeamEvent 
-                      ? `${Math.ceil(event.currentParticipants / (event.teamSize || 1))} teams (${event.currentParticipants} members)${event.maxTeams ? ` / ${event.maxTeams} max teams` : ''}`
+                      ? `${Math.ceil(event.currentParticipants / (event.membersPerTeam || 1))} teams (${event.currentParticipants} members)`
                       : `${event.currentParticipants} participants`
                     }
                   </span>
@@ -274,6 +316,22 @@ const ParticipantDashboard: React.FC = () => {
           );
         })()}
       </div>
+
+      {/* Receipt Re-upload Modal */}
+      {showReceiptReupload && selectedParticipant && (
+        <ReceiptReupload
+          participantId={selectedParticipant.id}
+          eventTitle={events.find(e => e.id === selectedParticipant.eventId)?.title || 'Event'}
+          onSuccess={() => {
+            // Refresh participants data
+            loadData();
+          }}
+          onClose={() => {
+            setShowReceiptReupload(false);
+            setSelectedParticipant(null);
+          }}
+        />
+      )}
     </div>
   );
 };

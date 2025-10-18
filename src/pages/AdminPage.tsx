@@ -24,6 +24,7 @@ import { realtimeService } from '../services/realtimeService';
 import { roleAuthService, RoleUser } from '../services/roleAuth';
 import { testFirebaseConnection } from '../utils/firebaseTest';
 import OfflineRegistration from '../components/OfflineRegistration';
+import RegistrationControls from '../components/RegistrationControls';
 
 const AdminPage: React.FC = () => {
   const navigate = useNavigate();
@@ -40,22 +41,27 @@ const AdminPage: React.FC = () => {
     description: '',
     roomNo: '',
     entryFee: 0,
-    maxTeams: 0,
     paymentMethod: 'both' as 'online' | 'offline' | 'both',
     upiId: '',
     isTeamEvent: false,
-    teamSize: 1,
     eventDay: 'day1' as 'day1' | 'day2',
     membersPerTeam: 1,
-    // On-the-spot registration fields
-    allowOnSpotRegistration: false,
+    // On-the-spot registration fields - default to enabled
+    allowOnSpotRegistration: true,
     onSpotEntryFee: 0,
     onSpotPaymentMethod: 'both' as 'online' | 'offline' | 'both',
     onSpotStartTime: '08:00',
     onSpotEndTime: '10:00',
   });
+  const [eventDates, setEventDates] = useState({
+    day1Date: '2024-11-13',
+    day2Date: '2024-11-14',
+    day1Time: '10:00',
+    day2Time: '10:00',
+  });
   const [showOfflineRegistration, setShowOfflineRegistration] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [showRegistrationControls, setShowRegistrationControls] = useState(false);
 
   useEffect(() => {
     // Check if admin is already logged in
@@ -113,9 +119,9 @@ const AdminPage: React.FC = () => {
     e.preventDefault();
     
     try {
-      // Set date and time automatically based on eventDay
-      const eventDate = newEvent.eventDay === 'day1' ? '2024-11-13' : '2024-11-14';
-      const eventTime = '10:00'; // Default time
+      // Set date and time based on eventDay and current date settings
+      const eventDate = newEvent.eventDay === 'day1' ? eventDates.day1Date : eventDates.day2Date;
+      const eventTime = newEvent.eventDay === 'day1' ? eventDates.day1Time : eventDates.day2Time;
       
       await dataService.createEvent({
         ...newEvent,
@@ -131,11 +137,9 @@ const AdminPage: React.FC = () => {
         description: '',
         roomNo: '',
         entryFee: 0,
-        maxTeams: 0,
         paymentMethod: 'both',
         upiId: '',
         isTeamEvent: false,
-        teamSize: 1,
         // Event categorization and team settings
         eventDay: 'day1',
         membersPerTeam: 1,
@@ -161,11 +165,9 @@ const AdminPage: React.FC = () => {
       description: event.description,
       roomNo: event.roomNo || '',
       entryFee: event.entryFee,
-      maxTeams: event.maxTeams || 0,
       paymentMethod: event.paymentMethod,
       upiId: event.upiId || '',
       isTeamEvent: event.isTeamEvent,
-      teamSize: event.teamSize || 1,
       // Event categorization and team settings
       eventDay: event.eventDay || 'day1',
       membersPerTeam: event.membersPerTeam || 1,
@@ -204,11 +206,9 @@ const AdminPage: React.FC = () => {
         description: '',
         roomNo: '',
         entryFee: 0,
-        maxTeams: 0,
         paymentMethod: 'both',
         upiId: '',
         isTeamEvent: false,
-        teamSize: 1,
         // Event categorization and team settings
         eventDay: 'day1',
         membersPerTeam: 1,
@@ -252,6 +252,16 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  const handleExportAllToPDF = async () => {
+    try {
+      await excelService.exportEventSummaryToPDF(events);
+      toast.success('Events PDF exported successfully!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export events PDF');
+    }
+  };
+
   const handleExportEventParticipants = async (event: Event) => {
     try {
       const participants = await dataService.getParticipantsByEvent(event.id);
@@ -260,6 +270,17 @@ const AdminPage: React.FC = () => {
     } catch (error) {
       console.error('Export error:', error);
       toast.error('Failed to export event participants');
+    }
+  };
+
+  const handleExportEventParticipantsToPDF = async (event: Event) => {
+    try {
+      const participants = await dataService.getParticipantsByEvent(event.id);
+      await excelService.exportParticipantsToPDF(participants, event);
+      toast.success('Event participants PDF exported successfully!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export event participants PDF');
     }
   };
 
@@ -330,6 +351,37 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  const handleUpdateEventDates = async () => {
+    try {
+      // Update all events for day1
+      const day1Events = events.filter(event => event.eventDay === 'day1');
+      for (const event of day1Events) {
+        await dataService.updateEvent(event.id, {
+          ...event,
+          date: eventDates.day1Date,
+          time: eventDates.day1Time,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      // Update all events for day2
+      const day2Events = events.filter(event => event.eventDay === 'day2');
+      for (const event of day2Events) {
+        await dataService.updateEvent(event.id, {
+          ...event,
+          date: eventDates.day2Date,
+          time: eventDates.day2Time,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      toast.success('Event dates updated successfully!');
+    } catch (error) {
+      console.error('Error updating event dates:', error);
+      toast.error('Failed to update event dates');
+    }
+  };
+
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -356,7 +408,7 @@ const AdminPage: React.FC = () => {
     setAdminUser(null);
     setIsAdminAuthenticated(false);
     toast.success('Logged out successfully');
-    navigate('/');
+    navigate('/admin');
   };
 
   const formatDate = (dateString: string) => {
@@ -417,13 +469,36 @@ const AdminPage: React.FC = () => {
                   <span className="ml-4 text-gray-400">Welcome, {adminUser?.username || 'Admin'}</span>
                 </div>
             <div className="flex items-center space-x-4">
-              <button
-                onClick={handleExportAll}
+              <Link
+                to="/admin/payments"
                 className="btn-secondary flex items-center"
               >
-                <Download className="h-4 w-4 mr-2" />
-                Export All
+                <DollarSign className="h-4 w-4 mr-2" />
+                Payment Tracking
+              </Link>
+              <button
+                onClick={() => setShowRegistrationControls(true)}
+                className="btn-secondary flex items-center"
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Registration Controls
               </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleExportAll}
+                  className="btn-secondary flex items-center"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Excel
+                </button>
+                <button
+                  onClick={handleExportAllToPDF}
+                  className="btn-secondary flex items-center"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export PDF
+                </button>
+              </div>
               <button
                 onClick={handleLogout}
                 className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
@@ -579,19 +654,6 @@ const AdminPage: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Max Teams (0 = unlimited)
-                </label>
-                <input
-                  type="number"
-                  value={newEvent.maxTeams}
-                  onChange={(e) => setNewEvent({ ...newEvent, maxTeams: parseInt(e.target.value) || 0 })}
-                  className="input-field"
-                  placeholder="Enter max teams"
-                  min="0"
-                />
-              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -804,16 +866,6 @@ const AdminPage: React.FC = () => {
                 />
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Max Teams</label>
-                <input
-                  type="number"
-                  value={newEvent.maxTeams}
-                  onChange={(e) => setNewEvent({ ...newEvent, maxTeams: Number(e.target.value) })}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                  min="1"
-                />
-              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Event Day</label>
@@ -955,18 +1007,6 @@ const AdminPage: React.FC = () => {
                     <span className="text-gray-300">Team Event</span>
                   </label>
                   
-                  {newEvent.isTeamEvent && (
-                    <div className="flex items-center">
-                      <label className="text-gray-300 mr-2">Team Size:</label>
-                      <input
-                        type="number"
-                        value={newEvent.teamSize}
-                        onChange={(e) => setNewEvent({ ...newEvent, teamSize: Number(e.target.value) })}
-                        className="w-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white"
-                        min="2"
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
               
@@ -1060,13 +1100,22 @@ const AdminPage: React.FC = () => {
                       >
                         <Eye className="h-4 w-4 text-gray-400" />
                       </Link>
-                      <button
-                        onClick={() => handleExportEventParticipants(event)}
-                        className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
-                        title="Export Participants"
-                      >
-                        <Download className="h-4 w-4 text-blue-400" />
-                      </button>
+                      <div className="flex space-x-1">
+                        <button
+                          onClick={() => handleExportEventParticipants(event)}
+                          className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
+                          title="Export Participants Excel"
+                        >
+                          <Download className="h-4 w-4 text-blue-400" />
+                        </button>
+                        <button
+                          onClick={() => handleExportEventParticipantsToPDF(event)}
+                          className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
+                          title="Export Participants PDF"
+                        >
+                          <Download className="h-4 w-4 text-red-400" />
+                        </button>
+                      </div>
                       {event.isTeamEvent && (
                         <button
                           onClick={() => handleExportTeamDetails(event)}
@@ -1159,6 +1208,130 @@ const AdminPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Payment Reference Guide */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-semibold text-white mb-6">Payment Reference Guide</h2>
+          <div className="bg-gray-800 rounded-xl p-6">
+            <p className="text-gray-300 mb-4">
+              <strong>How to match UPI transactions to participants:</strong>
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-white mb-3">Method 1: UPI Transaction Search</h3>
+                <ol className="text-sm text-gray-300 space-y-2">
+                  <li>1. Go to <strong>Payment Tracking</strong> page</li>
+                  <li>2. Use <strong>"UPI Transaction Verification"</strong> section</li>
+                  <li>3. Enter amount received and transaction time</li>
+                  <li>4. System will show matching participants</li>
+                  <li>5. Confirm the correct participant</li>
+                </ol>
+              </div>
+              
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-white mb-3">Method 2: Manual Search</h3>
+                <ol className="text-sm text-gray-300 space-y-2">
+                  <li>1. Note the amount from UPI app</li>
+                  <li>2. Search participants by amount in Payment Tracking</li>
+                  <li>3. Check registration time vs transaction time</li>
+                  <li>4. Verify participant details match</li>
+                  <li>5. Mark as paid manually</li>
+                </ol>
+              </div>
+            </div>
+            
+            <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <p className="text-blue-400 text-sm">
+                <strong>Tip:</strong> UPI apps show transaction IDs like "TXN123456789" but our system uses payment identifiers like "GEN123456ABC123". 
+                Use amount and time matching to find the right participant.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Event Dates Management */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-semibold text-white mb-6">Event Dates Management</h2>
+          <div className="bg-gray-800 rounded-xl p-6">
+            <p className="text-gray-300 mb-4">
+              Update dates and times for all events. Changes will apply to all events on the respective days.
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Day 1 Settings */}
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <Calendar className="h-5 w-5 mr-2 text-cyan-400" />
+                  Day 1 Events
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Date</label>
+                    <input
+                      type="date"
+                      value={eventDates.day1Date}
+                      onChange={(e) => setEventDates({ ...eventDates, day1Date: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Time</label>
+                    <input
+                      type="time"
+                      value={eventDates.day1Time}
+                      onChange={(e) => setEventDates({ ...eventDates, day1Time: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white"
+                    />
+                  </div>
+                  <div className="text-sm text-gray-400">
+                    {events.filter(e => e.eventDay === 'day1').length} events on Day 1
+                  </div>
+                </div>
+              </div>
+
+              {/* Day 2 Settings */}
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <Calendar className="h-5 w-5 mr-2 text-cyan-400" />
+                  Day 2 Events
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Date</label>
+                    <input
+                      type="date"
+                      value={eventDates.day2Date}
+                      onChange={(e) => setEventDates({ ...eventDates, day2Date: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Time</label>
+                    <input
+                      type="time"
+                      value={eventDates.day2Time}
+                      onChange={(e) => setEventDates({ ...eventDates, day2Time: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white"
+                    />
+                  </div>
+                  <div className="text-sm text-gray-400">
+                    {events.filter(e => e.eventDay === 'day2').length} events on Day 2
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={handleUpdateEventDates}
+                className="btn-primary flex items-center"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Update All Event Dates
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* On-the-Spot Pricing Management */}
         <div className="mt-8">
           <h2 className="text-2xl font-semibold text-white mb-6">On-the-Spot Pricing</h2>
@@ -1225,6 +1398,17 @@ const AdminPage: React.FC = () => {
           event={selectedEvent}
         />
       )}
+
+      {/* Registration Controls Modal */}
+      <RegistrationControls
+        isOpen={showRegistrationControls}
+        onClose={() => setShowRegistrationControls(false)}
+        currentUser={{ 
+          id: adminUser?.id || '', 
+          name: adminUser?.username || 'Admin', 
+          role: 'admin' 
+        }}
+      />
     </div>
   );
 };

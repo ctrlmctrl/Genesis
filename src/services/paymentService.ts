@@ -10,7 +10,7 @@ export interface PaymentDetails {
 
 export class PaymentService {
   generateUPIQRCode(paymentDetails: PaymentDetails): Promise<string> {
-    const upiString = `upi://pay?pa=${paymentDetails.upiId}&pn=${paymentDetails.merchantName}&am=${paymentDetails.amount}&cu=INR&tn=${paymentDetails.description}&tr=${paymentDetails.transactionId}`;
+    const upiString = `upi://pay?pa=${paymentDetails.upiId}&pn=${paymentDetails.merchantName}&am=${paymentDetails.amount}&cu=INR&tn=${paymentDetails.description}`;
     
     return QRCode.toDataURL(upiString, {
       width: 300,
@@ -23,19 +23,9 @@ export class PaymentService {
   }
 
   generateUPILink(paymentDetails: PaymentDetails): string {
-    return `upi://pay?pa=${paymentDetails.upiId}&pn=${paymentDetails.merchantName}&am=${paymentDetails.amount}&cu=INR&tn=${paymentDetails.description}&tr=${paymentDetails.transactionId}`;
+    return `upi://pay?pa=${paymentDetails.upiId}&pn=${paymentDetails.merchantName}&am=${paymentDetails.amount}&cu=INR&tn=${paymentDetails.description}`;
   }
 
-  generatePaymentId(): string {
-    return 'PAY_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  }
-
-  generatePaymentIdentifier(): string {
-    // Generate a unique identifier for UPI transaction matching
-    const timestamp = Date.now().toString();
-    const random = Math.random().toString(36).substr(2, 6).toUpperCase();
-    return `GEN${timestamp.slice(-6)}${random}`;
-  }
 
   formatAmount(amount: number): string {
     return `₹${amount.toFixed(2)}`;

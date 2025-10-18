@@ -11,8 +11,6 @@ export interface Event {
   paymentMethod: 'online' | 'offline' | 'both';
   upiId?: string;
   isTeamEvent: boolean;
-  teamSize?: number; // Number of team members required
-  maxTeams?: number; // Maximum number of teams allowed (for team events)
   eventDay: 'day1' | 'day2'; // Event categorization
   membersPerTeam?: number; // Number of members allowed per team
   
@@ -30,9 +28,35 @@ export interface Event {
   registrationEndTime?: string;   // HH:MM format
   allowLateRegistration?: boolean; // Admin/volunteer override
   
+  // Advanced registration controls
+  registrationControls?: {
+    allowAfterDeadline: boolean; // Allow registration after deadline
+    allowAfterDeadlineForAdmins: boolean; // Allow admins to register after deadline
+    allowAfterDeadlineForVolunteers: boolean; // Allow volunteers to register after deadline
+    deadlineOverrideReason?: string; // Reason for allowing late registration
+    setBy?: string; // Admin/volunteer who set the override
+    setAt?: string; // When the override was set
+  };
+  
   // Daily registration closure
   dailyRegistrationClosure?: {
     [date: string]: boolean; // YYYY-MM-DD format -> true if registration closed for that day
+  };
+  
+  // Day-wise registration controls
+  dayWiseControls?: {
+    day1?: {
+      allowRegistration: boolean;
+      registrationEndDate?: string;
+      registrationEndTime?: string;
+      allowLateRegistration?: boolean;
+    };
+    day2?: {
+      allowRegistration: boolean;
+      registrationEndDate?: string;
+      registrationEndTime?: string;
+      allowLateRegistration?: boolean;
+    };
   };
   
   createdAt: string;
@@ -46,6 +70,8 @@ export interface Participant {
   email: string;
   phone: string;
   college: string; // Added college name
+  standard: 'FY' | 'SY' | 'TY' | '11' | '12'; // Academic standard/year
+  stream: string; // Academic stream (e.g., Computer Science, Electronics, etc.)
   registrationDate: string;
   qrCode: string;
   isVerified: boolean;
@@ -53,13 +79,11 @@ export interface Participant {
   teamId?: string; // For team events
   teamName?: string; // For team events
   isTeamLead?: boolean; // For team events
-  paymentStatus: 'pending' | 'paid' | 'offline_paid';
+  paymentStatus: 'pending' | 'paid' | 'offline_paid' | 'failed';
   paymentMethod?: 'online' | 'offline';
-  paymentId?: string;
   receiptUrl?: string;
   registrationType?: 'regular' | 'on_spot'; // Track registration type
   entryFeePaid?: number; // Track actual fee paid (for on-the-spot different pricing)
-  paymentIdentifier?: string; // Unique identifier for UPI transaction matching
   assignedRoom?: string; // Room assigned during check-in/verification
 }
 

@@ -16,6 +16,8 @@
     "file-saver": "^2.0.5",
     "firebase": "^11.10.0",
     "framer-motion": "^10.16.0",
+    "jspdf": "^3.0.3",
+    "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.263.1",
     "postcss": "^8.4.31",
     "qr-scanner": "^1.4.2",

@@ -4,12 +4,13 @@ import { X, QrCode, ExternalLink, Upload, CheckCircle } from 'lucide-react';
 import { PaymentDetails } from '../services/paymentService';
 import { paymentService } from '../services/paymentService';
 import { fileUploadService } from '../services/fileUploadService';
+import { offlineCodeService } from '../services/offlineCodeService';
 import toast from 'react-hot-toast';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onPaymentComplete: (paymentId: string, method: 'online' | 'offline', receiptUrl?: string) => void;
+  onPaymentComplete: (method: 'online' | 'offline', receiptUrl?: string) => void;
   eventTitle: string;
   amount: number;
   upiId: string;
@@ -26,21 +27,21 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   participantId,
 }) => {
   const [qrCodeDataURL, setQrCodeDataURL] = useState<string>('');
-  const [paymentId, setPaymentId] = useState<string>('');
   const [selectedMethod, setSelectedMethod] = useState<'online' | 'offline'>('online');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [offlineCode, setOfflineCode] = useState('');
+  const [isValidatingCode, setIsValidatingCode] = useState(false);
 
   const generatePaymentQR = useCallback(async () => {
     const paymentDetails: PaymentDetails = {
       amount,
       upiId,
       merchantName: 'Genesis Events',
-      transactionId: paymentService.generatePaymentId(),
+      transactionId: '', // Remove transaction ID
       description: `Payment for ${eventTitle}`,
     };
 
-    setPaymentId(paymentDetails.transactionId);
     
     try {
       const qrCode = await paymentService.generateUPIQRCode(paymentDetails);
@@ -62,7 +63,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       amount,
       upiId,
       merchantName: 'Genesis Events',
-      transactionId: paymentId,
+      transactionId: '', // Remove transaction ID
       description: `Payment for ${eventTitle}`,
     });
 
@@ -76,14 +77,49 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     }
   };
 
+  const handleOfflineCodeValidation = async () => {
+    if (!offlineCode.trim()) {
+      toast.error('Please enter the payment code');
+      return;
+    }
+
+    if (!participantId) {
+      toast.error('Participant ID not found');
+      return;
+    }
+
+    setIsValidatingCode(true);
+    try {
+      const success = await offlineCodeService.useCode(offlineCode.trim().toUpperCase(), participantId);
+      
+      if (success) {
+        toast.success('Payment code validated successfully!');
+        onPaymentComplete('offline');
+        onClose();
+      } else {
+        toast.error('Invalid or expired payment code');
+      }
+    } catch (error) {
+      console.error('Code validation error:', error);
+      toast.error('Failed to validate payment code');
+    } finally {
+      setIsValidatingCode(false);
+    }
+  };
+
   const handlePaymentComplete = async () => {
+    if (selectedMethod === 'offline') {
+      await handleOfflineCodeValidation();
+      return;
+    }
+
     setIsProcessing(true);
     
     try {
       let receiptUrl: string | undefined;
       
-      // If offline payment and receipt is uploaded, upload the receipt
-      if (selectedMethod === 'offline' && receiptFile && participantId) {
+      // Upload receipt for online payments only
+      if (receiptFile && participantId) {
         receiptUrl = await fileUploadService.uploadReceipt(receiptFile, participantId);
         toast.success('Receipt uploaded successfully!');
       }
@@ -91,7 +127,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       // Simulate payment processing
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      onPaymentComplete(paymentId, selectedMethod, receiptUrl);
+      onPaymentComplete(selectedMethod, receiptUrl);
       toast.success('Payment completed successfully!');
       onClose();
     } catch (error) {
@@ -201,12 +237,31 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
                 <div className="text-center text-sm text-gray-400">
                   <p>UPI ID: {upiId}</p>
-                  <p>Transaction ID: {paymentId}</p>
-                  {participantId && (
-                    <p className="text-yellow-400 font-medium">
-                      Payment ID: {participantId.slice(-8).toUpperCase()}
-                    </p>
-                  )}
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-400 mb-2">After Payment</h4>
+                  <p className="text-sm text-blue-300 mb-3">
+                    Please upload a screenshot or photo of your payment receipt to complete the registration.
+                  </p>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Upload Payment Receipt *
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleReceiptUpload}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-500 file:text-white hover:file:bg-blue-400"
+                    />
+                    {receiptFile && (
+                      <p className="text-sm text-green-400 mt-2 flex items-center">
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        {receiptFile.name} uploaded
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -218,27 +273,26 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                   <h4 className="font-semibold text-yellow-400 mb-2">Offline Payment Instructions</h4>
                   <ul className="text-sm text-yellow-300 space-y-1">
                     <li>• Pay the entry fee in cash at the event venue</li>
-                    <li>• Upload a photo of your payment receipt</li>
-                    <li>• Your registration will be confirmed after verification</li>
+                    <li>• Get a payment code from the event staff</li>
+                    <li>• Enter the code below to complete your payment</li>
                   </ul>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Upload Payment Receipt
+                    Payment Code *
                   </label>
                   <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleReceiptUpload}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-cyan-500 file:text-white hover:file:bg-cyan-400"
+                    type="text"
+                    value={offlineCode}
+                    onChange={(e) => setOfflineCode(e.target.value.toUpperCase())}
+                    placeholder="Enter 6-character payment code"
+                    maxLength={6}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-center text-lg font-mono tracking-widest"
                   />
-                  {receiptFile && (
-                    <p className="text-sm text-green-400 mt-2 flex items-center">
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      {receiptFile.name} uploaded
-                    </p>
-                  )}
+                  <p className="text-xs text-gray-400 mt-1">
+                    Enter the 6-character code provided by event staff after cash payment
+                  </p>
                 </div>
               </div>
             )}
@@ -247,16 +301,16 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
             <div className="space-y-3">
               <button
                 onClick={handlePaymentComplete}
-                disabled={isProcessing || (selectedMethod === 'offline' && !receiptFile)}
+                disabled={isProcessing || isValidatingCode || (selectedMethod === 'online' && !receiptFile) || (selectedMethod === 'offline' && !offlineCode.trim())}
                 className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isProcessing ? (
+                {isProcessing || isValidatingCode ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Processing...
+                    {isValidatingCode ? 'Validating Code...' : 'Processing...'}
                   </div>
                 ) : (
-                  'Complete Payment'
+                  selectedMethod === 'offline' ? 'Validate Payment Code' : 'Complete Payment'
                 )}
               </button>
               

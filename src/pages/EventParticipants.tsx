@@ -172,6 +172,21 @@ const EventParticipants: React.FC = () => {
     }
   };
 
+  const handleExportToPDF = async () => {
+    if (!event || participants.length === 0) return;
+    
+    try {
+      setExporting(true);
+      await excelService.exportParticipantsToPDF(participants, event);
+      toast.success('PDF exported successfully!');
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast.error('Failed to export PDF');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1); // Reset to first page when searching
@@ -252,14 +267,24 @@ const EventParticipants: React.FC = () => {
         </button>
         
         {participants.length > 0 && (
-          <button
-            onClick={handleExportParticipants}
-            disabled={exporting}
-            className="btn-secondary flex items-center"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            {exporting ? 'Exporting...' : 'Export'}
-          </button>
+          <div className="flex space-x-2">
+            <button
+              onClick={handleExportParticipants}
+              disabled={exporting}
+              className="btn-secondary flex items-center"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {exporting ? 'Exporting...' : 'Export Excel'}
+            </button>
+            <button
+              onClick={handleExportToPDF}
+              disabled={exporting}
+              className="btn-secondary flex items-center"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {exporting ? 'Exporting...' : 'Export PDF'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -278,7 +303,7 @@ const EventParticipants: React.FC = () => {
           <div className="flex items-center text-gray-600">
             <Users className="h-4 w-4 mr-2" />
             {event.isTeamEvent 
-              ? `Team Event${event.maxTeams ? ` (Max ${event.maxTeams} teams)` : ''}`
+              ? `Team Event`
               : 'Individual Event'
             }
           </div>
@@ -371,7 +396,7 @@ const EventParticipants: React.FC = () => {
               {paginatedParticipants.map((participant) => (
               <div
                 key={participant.id}
-                className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                className="border border-gray-600 rounded-lg p-4 hover:bg-gray-700 transition-colors bg-gray-800"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
@@ -406,6 +431,8 @@ const EventParticipants: React.FC = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
                   <div>College: {participant.college}</div>
+                  <div>Standard: {participant.standard}</div>
+                  <div>Stream: {participant.stream}</div>
                   <div>Registration: {new Date(participant.registrationDate).toLocaleDateString()}</div>
                   {participant.teamName && (
                     <div>Team: {participant.teamName}</div>
