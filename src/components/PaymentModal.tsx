@@ -37,8 +37,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     const paymentDetails: PaymentDetails = {
       amount,
       upiId,
-      merchantName: 'Genesis Events',
-      transactionId: '', // Remove transaction ID
       description: `Payment for ${eventTitle}`,
     };
 
@@ -62,8 +60,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     const upiLink = paymentService.generateUPILink({
       amount,
       upiId,
-      merchantName: 'Genesis Events',
-      transactionId: '', // Remove transaction ID
       description: `Payment for ${eventTitle}`,
     });
 

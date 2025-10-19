@@ -3,14 +3,12 @@ import QRCode from 'qrcode';
 export interface PaymentDetails {
   amount: number;
   upiId: string;
-  merchantName: string;
-  transactionId: string;
   description: string;
 }
 
 export class PaymentService {
   generateUPIQRCode(paymentDetails: PaymentDetails): Promise<string> {
-    const upiString = `upi://pay?pa=${paymentDetails.upiId}&pn=${paymentDetails.merchantName}&am=${paymentDetails.amount}&cu=INR&tn=${paymentDetails.description}`;
+    const upiString = `upi://pay?pa=${paymentDetails.upiId}&am=${paymentDetails.amount}&cu=INR&tn=${paymentDetails.description}`;
     
     return QRCode.toDataURL(upiString, {
       width: 300,
@@ -23,7 +21,7 @@ export class PaymentService {
   }
 
   generateUPILink(paymentDetails: PaymentDetails): string {
-    return `upi://pay?pa=${paymentDetails.upiId}&pn=${paymentDetails.merchantName}&am=${paymentDetails.amount}&cu=INR&tn=${paymentDetails.description}`;
+    return `upi://pay?pa=${paymentDetails.upiId}&am=${paymentDetails.amount}&cu=INR&tn=${paymentDetails.description}`;
   }
 
 
