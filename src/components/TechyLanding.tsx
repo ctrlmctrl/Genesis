@@ -262,7 +262,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                     <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-cyan-300 transition-colors">
                       {event.title}
                     </h3>
-                    <p className="text-gray-300 mb-4">{event.description}</p>
+                    <p className="text-gray-300 mb-4 whitespace-pre-line">{event.description}</p>
                   </div>
                         <div className="flex items-center text-cyan-400 ml-4">
                     <Calendar className="h-5 w-5 mr-1" />
@@ -355,7 +355,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                           <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-purple-300 transition-colors">
                             {event.title}
                           </h3>
-                          <p className="text-gray-300 mb-4">{event.description}</p>
+                          <p className="text-gray-300 mb-4 whitespace-pre-line">{event.description}</p>
                         </div>
                         <div className="flex items-center text-purple-400 ml-4">
                           <Calendar className="h-5 w-5 mr-1" />
