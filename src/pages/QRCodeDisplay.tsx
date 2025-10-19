@@ -162,6 +162,9 @@ const QRCodeDisplay: React.FC = () => {
                 {participant.isVerified ? 'Verified' : 'Pending Verification'}
               </span>
             </p>
+              {participant.isVerified && participant.assignedRoom && (
+                <p><strong>Assigned Room:</strong> <span className="text-green-600">{participant.assignedRoom}</span></p>
+              )}
           </div>
         </div>
 

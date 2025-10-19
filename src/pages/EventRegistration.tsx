@@ -7,6 +7,7 @@ import { Event } from '../types';
 import { dataService } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import GoogleLogin from '../components/GoogleLogin';
+import TeamRegistrationForm from '../components/TeamRegistrationForm';
 import PaymentModal from '../components/PaymentModal';
 import { canUserRegister, getRegistrationCountdown, isRegistrationOpen, isOnSpotRegistrationAvailable, getEntryFee, getPaymentMethod, getRegistrationType } from '../services/registrationService';
 import { paymentService } from '../services/paymentService';
@@ -34,6 +35,7 @@ const EventRegistration: React.FC = () => {
     timeRemaining?: string;
   }>({ canRegister: true });
   const [registrationType, setRegistrationType] = useState<'regular' | 'on_spot'>('regular');
+  const [showTeamForm, setShowTeamForm] = useState(false);
 
   const {
     register,
@@ -61,6 +63,10 @@ const EventRegistration: React.FC = () => {
         // Determine registration type
         const regType = getRegistrationType(eventData);
         setRegistrationType(regType);
+        // If this is a team event, show team registration form by default
+        if (eventData.isTeamEvent) {
+          setShowTeamForm(true);
+        }
       } catch (error) {
         console.error('Error loading event:', error);
         toast.error('Failed to load event details');
@@ -75,8 +81,9 @@ const EventRegistration: React.FC = () => {
   const onSubmit = async (data: RegistrationForm) => {
     if (!event || !isAuthenticated) return;
     
-    // Check if this is a team event
+    // If somehow user submits individual form for a team event, block and show team form
     if (event.isTeamEvent) {
+      setShowTeamForm(true);
       toast.error('This is a team event. Please use team registration.');
       return;
     }
@@ -301,125 +308,131 @@ const EventRegistration: React.FC = () => {
         </div>
       )}
 
-      {/* Registration Form */}
-      <div className="card-glow">
-        <h3 className="text-lg font-semibold text-white mb-4">Registration Form</h3>
-        
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Full Name *
-            </label>
-            <input
-              type="text"
-              {...register('fullName', { 
-                required: 'Full name is required',
-                pattern: {
-                  value: /^[A-Z][a-zA-Z\s]*$/,
-                  message: 'Name must start with a capital letter'
-                }
-              })}
-              className="input-field"
-              placeholder="Enter your full name"
-            />
-            {errors.fullName && (
-              <p className="text-red-400 text-sm mt-1">{errors.fullName.message}</p>
-            )}
-          </div>
+      {/* Registration Form: Show TeamRegistrationForm for team events, else show individual form */}
+      {event.isTeamEvent ? (
+        <TeamRegistrationForm
+          event={event}
+          onCancel={() => navigate(-1)}
+          onSuccess={(participants) => {
+            toast.success('Team registered successfully');
+            // Navigate to first participant's QR page if available
+            const first = participants && participants[0];
+            if (first && first.id) {
+              navigate(`/qr/${first.id}`);
+            }
+          }}
+        />
+      ) : (
+        <div className="card-glow">
+          <h3 className="text-lg font-semibold text-white mb-4">Registration Form</h3>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Full Name *
+              </label>
+              <input
+                type="text"
+                {...register('fullName', { 
+                  required: 'Full name is required',
+                  pattern: {
+                    value: /^[A-Z][a-zA-Z\s]*$/,
+                    message: 'Name must start with a capital letter'
+                  }
+                })}
+                className="input-field"
+                placeholder="Enter your full name"
+              />
+              {errors.fullName && (
+                <p className="text-red-400 text-sm mt-1">{errors.fullName.message}</p>
+              )}
+            </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Phone Number *
+              </label>
+              <input
+                type="tel"
+                {...register('phone', { 
+                  required: 'Phone number is required',
+                  pattern: {
+                    value: /^[6-9]\d{9}$/,
+                    message: 'Phone number must be 10 digits starting with 6, 7, 8, or 9'
+                  }
+                })}
+                className="input-field"
+                placeholder="Enter your 10-digit phone number"
+              />
+              {errors.phone && (
+                <p className="text-red-400 text-sm mt-1">{errors.phone.message}</p>
+              )}
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Phone Number *
-            </label>
-            <input
-              type="tel"
-              {...register('phone', { 
-                required: 'Phone number is required',
-                pattern: {
-                  value: /^[6-9]\d{9}$/,
-                  message: 'Phone number must be 10 digits starting with 6, 7, 8, or 9'
-                }
-              })}
-              className="input-field"
-              placeholder="Enter your 10-digit phone number"
-            />
-            {errors.phone && (
-              <p className="text-red-400 text-sm mt-1">{errors.phone.message}</p>
-            )}
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                College/Institution *
+              </label>
+              <input
+                type="text"
+                {...register('college', { required: 'College/Institution is required' })}
+                className="input-field"
+                placeholder="Enter your college or institution name"
+              />
+              {errors.college && (
+                <p className="text-red-400 text-sm mt-1">{errors.college.message}</p>
+              )}
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              College/Institution *
-            </label>
-            <input
-              type="text"
-              {...register('college', { required: 'College/Institution is required' })}
-              className="input-field"
-              placeholder="Enter your college or institution name"
-            />
-            {errors.college && (
-              <p className="text-red-400 text-sm mt-1">{errors.college.message}</p>
-            )}
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Standard/Year *
+              </label>
+              <select
+                {...register('standard', { required: 'Standard/Year is required' })}
+                className="input-field"
+              >
+                <option value="">Select your standard/year</option>
+                <option value="FY">First Year (FY)</option>
+                <option value="SY">Second Year (SY)</option>
+                <option value="TY">Third Year (TY)</option>
+                <option value="11">11th Standard</option>
+                <option value="12">12th Standard</option>
+              </select>
+              {errors.standard && (
+                <p className="text-red-400 text-sm mt-1">{errors.standard.message}</p>
+              )}
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Standard/Year *
-            </label>
-            <select
-              {...register('standard', { required: 'Standard/Year is required' })}
-              className="input-field"
-            >
-              <option value="">Select your standard/year</option>
-              <option value="FY">First Year (FY)</option>
-              <option value="SY">Second Year (SY)</option>
-              <option value="TY">Third Year (TY)</option>
-              <option value="11">11th Standard</option>
-              <option value="12">12th Standard</option>
-            </select>
-            {errors.standard && (
-              <p className="text-red-400 text-sm mt-1">{errors.standard.message}</p>
-            )}
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Stream/Branch *
+              </label>
+              <input
+                type="text"
+                {...register('stream', { required: 'Stream/Branch is required' })}
+                className="input-field"
+                placeholder="e.g., Computer Science, Electronics, Mechanical, etc."
+              />
+              {errors.stream && (
+                <p className="text-red-400 text-sm mt-1">{errors.stream.message}</p>
+              )}
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Stream/Branch *
-            </label>
-            <input
-              type="text"
-              {...register('stream', { required: 'Stream/Branch is required' })}
-              className="input-field"
-              placeholder="e.g., Computer Science, Electronics, Mechanical, etc."
-            />
-            {errors.stream && (
-              <p className="text-red-400 text-sm mt-1">{errors.stream.message}</p>
-            )}
-          </div>
-
-          <div className="flex space-x-4">
-            <button
-              type="submit"
-              disabled={submitting || !registrationStatus.canRegister || event.isTeamEvent}
-              className={`btn-primary flex-1 ${(!registrationStatus.canRegister || event.isTeamEvent) ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {submitting ? 'Registering...' : 
-               event.isTeamEvent ? 'Team Event - Use Team Registration' :
-               !registrationStatus.canRegister ? 'Registration Closed' : 
-               registrationType === 'on_spot' ? 'Register On-the-Spot' :
-               'Register for Event'}
-            </button>
-            
-            {event.isTeamEvent && (
-              <div className="text-center text-gray-400 text-sm">
-                Team registration coming soon
-              </div>
-            )}
-          </div>
-        </form>
-      </div>
+            <div className="flex space-x-4">
+              <button
+                type="submit"
+                disabled={submitting || !registrationStatus.canRegister}
+                className={`btn-primary flex-1 ${(!registrationStatus.canRegister) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {submitting ? 'Registering...' : 
+                 !registrationStatus.canRegister ? 'Registration Closed' : 
+                 registrationType === 'on_spot' ? 'Register On-the-Spot' :
+                 'Register for Event'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Payment Modal */}
       {event && getEntryFee(event, registrationType) > 0 && (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, Download, CheckCircle, Clock, User, Mail, Phone, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Users, Download, CheckCircle, Clock, User, Mail, Phone, MapPin, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Participant, Event } from '../types';
 import { dataService } from '../services/dataService';
 import { excelService } from '../services/excelService';
@@ -210,6 +210,10 @@ const EventParticipants: React.FC = () => {
         return 'text-blue-400 bg-blue-400/10';
       case 'pending':
         return 'text-yellow-400 bg-yellow-400/10';
+      case 'under_verification':
+        return 'text-purple-400 bg-purple-400/10';
+      case 'failed':
+        return 'text-red-400 bg-red-400/10';
       default:
         return 'text-gray-400 bg-gray-400/10';
     }
@@ -222,6 +226,10 @@ const EventParticipants: React.FC = () => {
         return <CheckCircle className="h-4 w-4" />;
       case 'pending':
         return <Clock className="h-4 w-4" />;
+      case 'under_verification':
+        return <Clock className="h-4 w-4" />;
+      case 'failed':
+        return <X className="h-4 w-4" />;
       default:
         return <Clock className="h-4 w-4" />;
     }

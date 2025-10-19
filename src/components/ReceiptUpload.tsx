@@ -89,10 +89,10 @@ const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
     try {
       const receiptUrl = await fileUploadService.uploadReceipt(selectedFile, participantId);
       
-      // Update participant with receipt URL
+      // Update participant with receipt URL and set status to under_verification
       await dataService.updatePaymentStatus(
         participantId,
-        'paid',
+        'under_verification',
         'online',
         receiptUrl
       );

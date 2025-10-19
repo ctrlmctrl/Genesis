@@ -170,10 +170,14 @@ const ParticipantDashboard: React.FC = () => {
                     <span className={`px-2 py-1 rounded-full text-xs ${
                       participant.paymentStatus === 'paid' ? 'bg-green-500/20 text-green-400' :
                       participant.paymentStatus === 'offline_paid' ? 'bg-blue-500/20 text-blue-400' :
+                      participant.paymentStatus === 'under_verification' ? 'bg-purple-500/20 text-purple-400' :
+                      participant.paymentStatus === 'failed' ? 'bg-red-500/20 text-red-400' :
                       'bg-yellow-500/20 text-yellow-400'
                     }`}>
                       {participant.paymentStatus === 'paid' ? 'Paid' :
-                       participant.paymentStatus === 'offline_paid' ? 'Offline Paid' : 'Pending'}
+                       participant.paymentStatus === 'offline_paid' ? 'Offline Paid' :
+                       participant.paymentStatus === 'under_verification' ? 'Under Review' :
+                       participant.paymentStatus === 'failed' ? 'Failed' : 'Pending'}
                     </span>
                   </div>
 
@@ -184,10 +188,16 @@ const ParticipantDashboard: React.FC = () => {
                           <Calendar className="h-4 w-4 mr-3" />
                           {event.eventDay === 'day1' ? 'Day 1 Event' : 'Day 2 Event'}
                         </div>
-                        {participant.assignedRoom && (
+                        {participant.isVerified && participant.assignedRoom && (
                           <div className="flex items-center text-sm text-green-400">
                             <MapPin className="h-4 w-4 mr-3" />
-                            Assigned Room: {participant.assignedRoom}
+                            Room: {participant.assignedRoom}
+                          </div>
+                        )}
+                        {!participant.isVerified && (
+                          <div className="flex items-center text-sm text-gray-400">
+                            <MapPin className="h-4 w-4 mr-3" />
+                            Room will be assigned after verification
                           </div>
                         )}
                       </>
@@ -214,6 +224,20 @@ const ParticipantDashboard: React.FC = () => {
                   )}
 
                   {/* Failed Payment Re-upload Section */}
+                  {participant.paymentStatus === 'under_verification' && (
+                    <div className="mb-4">
+                      <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
+                        <div className="flex items-center mb-2">
+                          <div className="h-2 w-2 bg-purple-400 rounded-full mr-2"></div>
+                          <span className="text-purple-400 font-medium">Payment Under Review</span>
+                        </div>
+                        <p className="text-sm text-purple-300">
+                          Your payment receipt is being verified by our team. This usually takes 1-2 business days.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {participant.paymentStatus === 'failed' && (
                     <div className="mb-4">
                       <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-4">
@@ -298,10 +322,7 @@ const ParticipantDashboard: React.FC = () => {
                     <Calendar className="h-4 w-4 mr-3" />
                     {event.eventDay === 'day1' ? 'Day 1 Event' : 'Day 2 Event'}
                   </div>
-                  <div className="flex items-center text-sm text-gray-400">
-                    <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
-                    Room will be assigned at check-in
-                  </div>
+                  {/* Room number hidden from event card for participants */}
                 </div>
 
                 <Link

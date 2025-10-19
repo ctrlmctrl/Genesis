@@ -353,6 +353,10 @@ class DataService {
         qrCode: uniqueQRCode,
         isVerified: false,
         paymentStatus: 'pending' as const,
+        // Only include optional fields if they have values
+        ...(participantData as any).registrationType ? { registrationType: (participantData as any).registrationType } : {},
+        ...(participantData as any).entryFeePaid ? { entryFeePaid: (participantData as any).entryFeePaid } : {},
+        ...(participantData as any).assignedRoom ? { assignedRoom: (participantData as any).assignedRoom } : {},
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -585,7 +589,8 @@ class DataService {
         const member = teamMembers[i];
         const uniqueQRCode = QRCodeService.generateUniqueQRCode();
         
-        const participantDoc = {
+        // Only add optional fields if they are defined
+        const participantDoc: any = {
           eventId,
           fullName: member.fullName,
           email: member.email,
@@ -603,6 +608,9 @@ class DataService {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
+        if ((member as any).registrationType !== undefined) participantDoc.registrationType = (member as any).registrationType;
+        if ((member as any).entryFeePaid !== undefined) participantDoc.entryFeePaid = (member as any).entryFeePaid;
+        if ((member as any).assignedRoom !== undefined) participantDoc.assignedRoom = (member as any).assignedRoom;
 
         const docRef = await addDoc(collection(db, 'participants'), participantDoc);
         
@@ -622,9 +630,9 @@ class DataService {
           teamId: participantDoc.teamId,
           teamName: participantDoc.teamName,
           isTeamLead: participantDoc.isTeamLead,
-          // registrationType: participantDoc.registrationType,
-          // entryFeePaid: participantDoc.entryFeePaid,
-          // assignedRoom: participantDoc.assignedRoom
+          ...(participantDoc.registrationType ? { registrationType: participantDoc.registrationType } : {}),
+          ...(participantDoc.entryFeePaid ? { entryFeePaid: participantDoc.entryFeePaid } : {}),
+          ...(participantDoc.assignedRoom ? { assignedRoom: participantDoc.assignedRoom } : {})
         };
 
         registeredMembers.push(participant);
@@ -655,9 +663,9 @@ class DataService {
     return this.participants[participantIndex];
   }
 
-  async updatePaymentStatus(participantId: string, paymentStatus: 'pending' | 'paid' | 'offline_paid' | 'failed', paymentMethod?: 'online' | 'offline', receiptUrl?: string): Promise<Participant | null> {
+  async updatePaymentStatus(participantId: string, paymentStatus: 'pending' | 'under_verification' | 'paid' | 'offline_paid' | 'failed', paymentMethod?: 'online' | 'offline', receiptUrl?: string, transactionId?: string): Promise<Participant | null> {
     if (this.useFirebase) {
-      return this.updatePaymentStatusFirebase(participantId, paymentStatus, paymentMethod, receiptUrl);
+      return this.updatePaymentStatusFirebase(participantId, paymentStatus, paymentMethod, receiptUrl, transactionId);
     }
 
     const participantIndex = this.participants.findIndex(p => p.id === participantId);
@@ -666,7 +674,8 @@ class DataService {
     const oldStatus = this.participants[participantIndex].paymentStatus;
     this.participants[participantIndex].paymentStatus = paymentStatus;
     if (paymentMethod) this.participants[participantIndex].paymentMethod = paymentMethod;
-    if (receiptUrl) this.participants[participantIndex].receiptUrl = receiptUrl;
+  if (receiptUrl) this.participants[participantIndex].receiptUrl = receiptUrl;
+  if (transactionId) this.participants[participantIndex].transactionId = transactionId;
 
     // Send email notification if status changed to verified or failed
     if (oldStatus !== paymentStatus && (paymentStatus === 'paid' || paymentStatus === 'offline_paid' || paymentStatus === 'failed')) {
@@ -677,7 +686,7 @@ class DataService {
     return this.participants[participantIndex];
   }
 
-  private async updatePaymentStatusFirebase(participantId: string, paymentStatus: 'pending' | 'paid' | 'offline_paid' | 'failed', paymentMethod?: 'online' | 'offline', receiptUrl?: string): Promise<Participant | null> {
+  private async updatePaymentStatusFirebase(participantId: string, paymentStatus: 'pending' | 'under_verification' | 'paid' | 'offline_paid' | 'failed', paymentMethod?: 'online' | 'offline', receiptUrl?: string, transactionId?: string): Promise<Participant | null> {
     try {
       const participantRef = doc(db, 'participants', participantId);
       const participantDoc = await getDoc(participantRef);
@@ -696,6 +705,7 @@ class DataService {
 
       if (paymentMethod) updateData.paymentMethod = paymentMethod;
       if (receiptUrl) updateData.receiptUrl = receiptUrl;
+      if (transactionId) updateData.transactionId = transactionId;
 
       await updateDoc(participantRef, updateData);
 

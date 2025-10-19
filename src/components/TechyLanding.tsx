@@ -281,12 +281,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                     })}
                   </div>
                   
-                  {event.roomNo && (
-                    <div className="flex items-center text-gray-400">
-                      <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
-                      Room: {event.roomNo}
-                    </div>
-                  )}
+                  {/* Room number hidden until participant is verified */}
                   
                   {event.entryFee > 0 && (
                     <div className="flex items-center text-cyan-400">
@@ -379,12 +374,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                           })}
                         </div>
                         
-                        {event.roomNo && (
-                          <div className="flex items-center text-gray-400">
-                            <MapPin className="h-4 w-4 mr-3 text-purple-400" />
-                            Room: {event.roomNo}
-                          </div>
-                        )}
+                        {/* Room number hidden until participant is verified */}
                         
                         {event.entryFee > 0 && (
                           <div className="flex items-center text-purple-400">

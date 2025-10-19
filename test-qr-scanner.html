@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Scanner Test</title>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        #qr-reader {
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #333;
+        }
+        #qr-reader video {
+            width: 100% !important;
+            height: auto !important;
+            border-radius: 12px;
+        }
+        .btn {
+            background: #0891b2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .btn:hover {
+            background: #0e7490;
+        }
+        .result {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 QR Scanner Test</h1>
+    <p>This test verifies that the html5-qrcode library works properly despite missing source map files.</p>
+    
+    <button id="start-btn" class="btn">📷 Start Scanner</button>
+    <button id="stop-btn" class="btn" style="display: none;">⏹️ Stop Scanner</button>
+    
+    <div id="qr-reader" style="display: none;"></div>
+    
+    <div id="result" style="display: none;">
+        <h3>✅ QR Code Detected:</h3>
+        <div class="result" id="qr-result"></div>
+    </div>
+
+    <div id="manual-test">
+        <h3>📝 Manual Test</h3>
+        <p>If camera doesn't work, test with this sample QR code data:</p>
+        <div class="result">EVENT:sample-event-1:participant-123:user@email.com:1234567890</div>
+        <input type="text" id="manual-input" placeholder="Paste QR code text here" style="width: 100%; padding: 10px; margin: 10px 0; background: #333; color: white; border: 1px solid #555; border-radius: 4px;">
+        <button id="test-manual" class="btn">🧪 Test Manual Input</button>
+    </div>
+
+    <script>
+        let html5QrcodeScanner = null;
+
+        // Suppress source map warnings
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        console.warn = (...args) => {
+            if (!args[0]?.toString().includes('source map')) {
+                originalWarn.apply(console, args);
+            }
+        };
+        console.error = (...args) => {
+            if (!args[0]?.toString().includes('source map')) {
+                originalError.apply(console, args);
+            }
+        };
+
+        function onScanSuccess(decodedText, decodedResult) {
+            console.log(`QR Code scanned: ${decodedText}`, decodedResult);
+            document.getElementById('qr-result').textContent = decodedText;
+            document.getElementById('result').style.display = 'block';
+            
+            // Test parsing
+            testQRCode(decodedText);
+        }
+
+        function onScanError(errorMessage) {
+            // Ignore common scanning errors
+            if (!errorMessage.includes('NotFoundException') && !errorMessage.includes('No MultiFormat Readers')) {
+                console.log('QR scan error:', errorMessage);
+            }
+        }
+
+        function testQRCode(qrText) {
+            try {
+                const parts = qrText.split(':');
+                if (parts.length >= 4 && parts[0] === 'EVENT') {
+                    const eventId = parts[1];
+                    const participantId = parts[2];
+                    const email = parts[3];
+                    const timestamp = parts[4];
+                    
+                    console.log('✅ Valid QR Code Format:');
+                    console.log('Event ID:', eventId);
+                    console.log('Participant ID:', participantId);
+                    console.log('Email:', email);
+                    console.log('Timestamp:', timestamp);
+                    
+                    alert('✅ QR Code is valid and properly formatted!');
+                } else {
+                    console.log('❌ Invalid QR Code format');
+                    alert('❌ QR Code format is invalid');
+                }
+            } catch (error) {
+                console.error('Error parsing QR code:', error);
+                alert('❌ Error parsing QR code');
+            }
+        }
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            const qrReaderDiv = document.getElementById('qr-reader');
+            qrReaderDiv.style.display = 'block';
+            
+            html5QrcodeScanner = new Html5QrcodeScanner(
+                "qr-reader",
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0,
+                    disableFlip: false,
+                    rememberLastUsedCamera: true,
+                    showTorchButtonIfSupported: true,
+                    showZoomSliderIfSupported: true,
+                    videoConstraints: {
+                        facingMode: 'environment'
+                    }
+                },
+                false
+            );
+            
+            html5QrcodeScanner.render(onScanSuccess, onScanError);
+            
+            document.getElementById('start-btn').style.display = 'none';
+            document.getElementById('stop-btn').style.display = 'inline-block';
+        });
+
+        document.getElementById('stop-btn').addEventListener('click', () => {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.clear().then(() => {
+                    document.getElementById('qr-reader').style.display = 'none';
+                    document.getElementById('start-btn').style.display = 'inline-block';
+                    document.getElementById('stop-btn').style.display = 'none';
+                    document.getElementById('result').style.display = 'none';
+                }).catch(err => {
+                    console.error('Error stopping scanner:', err);
+                });
+            }
+        });
+
+        document.getElementById('test-manual').addEventListener('click', () => {
+            const manualInput = document.getElementById('manual-input').value.trim();
+            if (manualInput) {
+                testQRCode(manualInput);
+                document.getElementById('qr-result').textContent = manualInput;
+                document.getElementById('result').style.display = 'block';
+            } else {
+                alert('Please enter QR code text first');
+            }
+        });
+
+        // Restore console methods after page load
+        setTimeout(() => {
+            console.warn = originalWarn;
+            console.error = originalError;
+            console.log('🔧 QR Scanner Test Ready - Source map warnings suppressed');
+        }, 2000);
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+

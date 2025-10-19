@@ -79,9 +79,10 @@ export interface Participant {
   teamId?: string; // For team events
   teamName?: string; // For team events
   isTeamLead?: boolean; // For team events
-  paymentStatus: 'pending' | 'paid' | 'offline_paid' | 'failed';
+  paymentStatus: 'pending' | 'under_verification' | 'paid' | 'offline_paid' | 'failed';
   paymentMethod?: 'online' | 'offline';
   receiptUrl?: string;
+  transactionId?: string; // Optional transaction identifier entered by admin to match UPI transactions
   registrationType?: 'regular' | 'on_spot'; // Track registration type
   entryFeePaid?: number; // Track actual fee paid (for on-the-spot different pricing)
   assignedRoom?: string; // Room assigned during check-in/verification

@@ -15,11 +15,12 @@ const PaymentTracking: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'paid' | 'offline_paid' | 'failed'>('all');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'under_verification' | 'paid' | 'offline_paid' | 'failed'>('all');
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
   const [showPaymentVerification, setShowPaymentVerification] = useState(false);
   const [verificationIdentifier, setVerificationIdentifier] = useState('');
   const [verificationParticipant, setVerificationParticipant] = useState<Participant | null>(null);
+  const [adminTransactionId, setAdminTransactionId] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [showUPIVerification, setShowUPIVerification] = useState(false);
   const [upiTransaction, setUpiTransaction] = useState({
@@ -206,6 +207,8 @@ const PaymentTracking: React.FC = () => {
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'failed':
         return 'bg-red-100 text-red-800 border-red-200';
+      case 'under_verification':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -221,6 +224,8 @@ const PaymentTracking: React.FC = () => {
         return <Clock className="h-3 w-3" />;
       case 'failed':
         return <X className="h-3 w-3" />;
+      case 'under_verification':
+        return <Clock className="h-3 w-3" />;
       default:
         return <AlertCircle className="h-3 w-3" />;
     }
@@ -258,6 +263,7 @@ const PaymentTracking: React.FC = () => {
   const paymentStats = {
     total: participants.length,
     pending: participants.filter(p => p.paymentStatus === 'pending').length,
+    under_verification: participants.filter(p => p.paymentStatus === 'under_verification').length,
     paid: participants.filter(p => p.paymentStatus === 'paid').length,
     offline_paid: participants.filter(p => p.paymentStatus === 'offline_paid').length,
     failed: participants.filter(p => p.paymentStatus === 'failed').length,
@@ -318,7 +324,7 @@ const PaymentTracking: React.FC = () => {
       </div>
 
       {/* Payment Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
         <div className="card-glow text-center">
           <div className="text-2xl font-bold text-white">{paymentStats.total}</div>
           <div className="text-sm text-gray-400">Total</div>
@@ -328,12 +334,20 @@ const PaymentTracking: React.FC = () => {
           <div className="text-sm text-gray-400">Pending</div>
         </div>
         <div className="card-glow text-center">
+          <div className="text-2xl font-bold text-purple-400">{paymentStats.under_verification}</div>
+          <div className="text-sm text-gray-400">Under Review</div>
+        </div>
+        <div className="card-glow text-center">
           <div className="text-2xl font-bold text-green-400">{paymentStats.paid}</div>
           <div className="text-sm text-gray-400">Online Paid</div>
         </div>
         <div className="card-glow text-center">
           <div className="text-2xl font-bold text-blue-400">{paymentStats.offline_paid}</div>
           <div className="text-sm text-gray-400">Offline Paid</div>
+        </div>
+        <div className="card-glow text-center md:col-span-2">
+          <div className="text-2xl font-bold text-red-400">{paymentStats.failed}</div>
+          <div className="text-sm text-gray-400">Failed/Rejected</div>
         </div>
       </div>
 
@@ -512,6 +526,53 @@ const PaymentTracking: React.FC = () => {
                   </button>
                 </div>
               )}
+                {/* Admin-only transaction ID entry and duplicate check */}
+                <div className="mt-4">
+                  <label className="block text-sm text-gray-300 mb-2">Transaction ID (admin only)</label>
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      value={adminTransactionId}
+                      onChange={(e) => setAdminTransactionId(e.target.value)}
+                      placeholder="e.g., TXN123456789 or bank reference"
+                      className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400"
+                    />
+                    <button
+                      onClick={async () => {
+                        if (!verificationParticipant) return;
+                        if (!adminTransactionId.trim()) {
+                          toast.error('Enter a transaction ID first');
+                          return;
+                        }
+
+                        // Check for duplicates
+                        const duplicate = participants.find(p => p.transactionId === adminTransactionId.trim() && p.id !== verificationParticipant.id);
+                        if (duplicate) {
+                          toast.error('Duplicate transaction ID found: another participant has the same transaction ID');
+                          return;
+                        }
+
+                        try {
+                          const updated = await dataService.updatePaymentStatus(verificationParticipant.id, 'paid', 'online', verificationParticipant.receiptUrl, adminTransactionId.trim());
+                          if (updated) {
+                            toast.success('Transaction ID saved and payment marked as paid');
+                            setVerificationParticipant(updated);
+                            setAdminTransactionId('');
+                            loadData();
+                          } else {
+                            toast.error('Failed to update participant');
+                          }
+                        } catch (err) {
+                          console.error('Error saving transaction ID:', err);
+                          toast.error('Failed to save transaction ID');
+                        }
+                      }}
+                      className="btn-primary text-sm"
+                    >
+                      Save & Verify
+                    </button>
+                  </div>
+                </div>
             </div>
           )}
         </div>
@@ -543,6 +604,7 @@ const PaymentTracking: React.FC = () => {
             >
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
+              <option value="under_verification">Under Verification</option>
               <option value="paid">Online Paid</option>
               <option value="offline_paid">Offline Paid</option>
               <option value="failed">Failed</option>
@@ -673,6 +735,12 @@ const PaymentTracking: React.FC = () => {
                     <div>
                       <strong className="text-gray-300">Registration Type:</strong>
                       <span className="ml-2 text-white capitalize">{participant.registrationType.replace('_', ' ')}</span>
+                    </div>
+                  )}
+                  {participant.transactionId && (
+                    <div>
+                      <strong className="text-gray-300">Transaction ID:</strong>
+                      <span className="ml-2 font-mono text-white">{participant.transactionId}</span>
                     </div>
                   )}
                   

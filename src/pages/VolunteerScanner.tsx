@@ -297,18 +297,14 @@ const VolunteerScanner: React.FC = () => {
           <div className="card-glow text-center">
             <QrCode className="h-16 w-16 mx-auto mb-4 text-cyan-400" />
             <h2 className="text-xl font-semibold text-white mb-2">Volunteer Scanner</h2>
-            <p className="text-gray-300 mb-6">
-              Scan participant QR codes to verify their attendance at the event.
-            </p>
-            
             <div className="space-y-3">
-            <button
-              onClick={startScanning}
+              <button
+                onClick={startScanning}
                 className="btn-primary w-full flex items-center justify-center text-lg py-4"
-            >
+              >
                 <Camera className="h-5 w-5 mr-2" />
                 Start Camera Scanning
-            </button>
+              </button>
             
             {/* Mobile-specific retry button */}
             {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && (
@@ -336,9 +332,12 @@ const VolunteerScanner: React.FC = () => {
                 </button>
               </div>
             )}
-              
-                </div>
-            
+            </div>
+
+            <div className="mt-4 text-gray-300">
+              <p className="mb-2">Scan participant QR codes to verify their attendance at the event.</p>
+              <p className="text-gray-500 text-xs">Ensure good lighting and center the QR code in the camera view.</p>
+            </div>
           </div>
 
         </div>

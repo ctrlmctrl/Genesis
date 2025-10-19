@@ -7,7 +7,7 @@ interface EmailTemplate {
 interface PaymentNotificationData {
   participantName: string;
   eventTitle: string;
-  paymentStatus: 'paid' | 'offline_paid' | 'failed';
+  paymentStatus: 'paid' | 'offline_paid' | 'failed' | 'under_verification';
   paymentMethod?: 'online' | 'offline';
   amount?: number;
   teamName?: string;
@@ -230,7 +230,7 @@ Genesis Events Team
       
       // Simulate email sending delay
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // If this is a team event and the participant is not the team lead,
       // also send notification to team lead
       if (data.teamLeadEmail && data.teamLeadEmail !== data.participantEmail) {
@@ -258,13 +258,13 @@ Genesis Events Team
         Team member ${teamMemberName}'s payment for ${eventTitle} has been ${paymentStatus === 'failed' ? 'rejected' : 'verified'}.
         ${paymentStatus === 'failed' ? 'Please ask them to re-upload their payment receipt.' : 'Your team registration is progressing well!'}
       `;
-      
+
       console.log('Sending team lead notification:', {
         to: teamLeadEmail,
         subject,
         message
       });
-      
+
       return true;
     } catch (error) {
       console.error('Error sending team lead notification:', error);
