@@ -207,7 +207,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
             {selectedMethod === 'online' && (
               <div className="space-y-4">
                 <div className="text-center">
-                  <h4 className="font-semibold text-white mb-2">Scan QR Code or Click to Pay</h4>
+                  <h4 className="font-semibold text-white mb-2">Scan QR Code</h4>
                   {qrCodeDataURL ? (
                     <div className="bg-white p-4 rounded-lg inline-block">
                       <img
@@ -223,7 +223,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                   )}
                 </div>
 
-                <button
+                {/* <button
                   onClick={handleUPIClick}
                   className="w-full btn-primary flex items-center justify-center"
                 >
@@ -233,7 +233,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
                 <div className="text-center text-sm text-gray-400">
                   <p>UPI ID: {upiId}</p>
-                </div>
+                </div> */}
 
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
                   <h4 className="font-semibold text-blue-400 mb-2">After Payment</h4>

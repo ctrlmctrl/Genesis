@@ -7,7 +7,7 @@ import { Event } from '../types';
 import { dataService } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import GoogleLogin from '../components/GoogleLogin';
-import TeamRegistrationForm from '../components/TeamRegistrationForm';
+// Team registration inlined below (TeamRegistrationForm removed)
 import PaymentModal from '../components/PaymentModal';
 import { canUserRegister, getRegistrationCountdown, isRegistrationOpen, isOnSpotRegistrationAvailable, getEntryFee, getPaymentMethod, getRegistrationType } from '../services/registrationService';
 import { paymentService } from '../services/paymentService';
@@ -36,6 +36,17 @@ const EventRegistration: React.FC = () => {
   }>({ canRegister: true });
   const [registrationType, setRegistrationType] = useState<'regular' | 'on_spot'>('regular');
   const [showTeamForm, setShowTeamForm] = useState(false);
+  // Team registration state (inlined)
+  const [teamName, setTeamName] = useState('');
+  const [teamMembers, setTeamMembers] = useState<any[]>(() => [{
+    fullName: '',
+    email: user?.email || '',
+    phone: '',
+    college: '',
+    standard: 'FY',
+    stream: ''
+  }]);
+  const [teamLoading, setTeamLoading] = useState(false);
 
   const {
     register,
@@ -125,12 +136,64 @@ const EventRegistration: React.FC = () => {
     }
   };
 
+  // Team registration handlers (inlined)
+  const handleTeamMemberChange = (index: number, field: string, value: string) => {
+    const copy = [...teamMembers];
+    copy[index] = { ...copy[index], [field]: value };
+    setTeamMembers(copy);
+  };
+
+  const addTeamMember = () => {
+    const max = event?.membersPerTeam || 1;
+    if (teamMembers.length < max) {
+      setTeamMembers([...teamMembers, { fullName: '', email: '', phone: '', college: '', standard: 'FY', stream: '' }]);
+    }
+  };
+
+  const removeTeamMember = (index: number) => {
+    if (index === 0) return;
+    setTeamMembers(teamMembers.filter((_, i) => i !== index));
+  };
+
+  const submitTeam = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!event) return;
+    if (!teamName.trim()) { toast.error('Please enter a team name'); return; }
+    // basic validation
+    for (let i = 0; i < teamMembers.length; i++) {
+      const m = teamMembers[i];
+      if (!m.fullName || !m.phone || !m.college || !m.standard || !m.stream) {
+        toast.error(`Please fill all details for team member ${i + 1}`); return;
+      }
+    }
+
+    setTeamLoading(true);
+    try {
+      const payload = teamMembers.map((m, idx) => ({
+        ...m,
+        email: idx === 0 ? (user?.email || '') : m.email,
+        entryFeePaid: idx === 0 ? event.entryFee : 0
+      }));
+
+      const participants = await dataService.registerTeam(event.id, teamName, payload);
+      // set participantId to team lead so payment modal can use it
+      setParticipantId(participants[0]?.id || '');
+      setShowPaymentModal(event.entryFee > 0);
+      setTeamLoading(false);
+      toast.success('Team registered — complete payment to finish registration');
+    } catch (err) {
+      console.error(err);
+      toast.error('Team registration failed');
+      setTeamLoading(false);
+    }
+  };
+
 
   const handlePaymentComplete = async (method: 'online' | 'offline', receiptUrl?: string) => {
     try {
       await dataService.updatePaymentStatus(
         participantId,
-        method === 'online' ? 'paid' : 'offline_paid',
+        method === 'online' ? 'pending' : 'offline_paid',
         method,
         receiptUrl
       );
@@ -308,20 +371,74 @@ const EventRegistration: React.FC = () => {
         </div>
       )}
 
-      {/* Registration Form: Show TeamRegistrationForm for team events, else show individual form */}
+      {/* Registration Form: show team form inline for team events, else individual form */}
       {event.isTeamEvent ? (
-        <TeamRegistrationForm
-          event={event}
-          onCancel={() => navigate(-1)}
-          onSuccess={(participants) => {
-            toast.success('Team registered successfully');
-            // Navigate to first participant's QR page if available
-            const first = participants && participants[0];
-            if (first && first.id) {
-              navigate(`/qr/${first.id}`);
-            }
-          }}
-        />
+        <div className="card-glow">
+          <h3 className="text-lg font-semibold text-white mb-4">Team Registration</h3>
+          <form onSubmit={(e) => { submitTeam(e); }} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Team Name *</label>
+              <input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} className="input-field" placeholder="Enter your team name" />
+            </div>
+
+            <div className="mb-4 bg-gray-800 p-4 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-semibold text-white">Team Registration Fee</h4>
+                  <p className="text-gray-300">One-time team payment</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-semibold text-white">₹{event.entryFee}</div>
+                  <div className="text-sm text-gray-400">{event.paymentMethod === 'both' ? 'Online/Offline' : event.paymentMethod}</div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium text-white">Team Members</h4>
+                {(teamMembers.length < (event.membersPerTeam || 1)) && (
+                  <button type="button" onClick={addTeamMember} className="btn-secondary">Add Member</button>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                {teamMembers.map((member, idx) => (
+                  <div key={idx} className="bg-gray-800 p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        <Users className="h-5 w-5 text-cyan-400 mr-2" />
+                        <div className="text-white font-medium">Member {idx + 1}{idx === 0 ? ' (Team Lead)' : ''}</div>
+                      </div>
+                      {idx !== 0 && (<button type="button" onClick={() => removeTeamMember(idx)} className="text-red-400">Remove</button>)}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <input required className="input-field" placeholder="Full name" value={member.fullName} onChange={(e) => handleTeamMemberChange(idx, 'fullName', e.target.value)} />
+                      <input required className="input-field" placeholder="Email" value={member.email} onChange={(e) => handleTeamMemberChange(idx, 'email', e.target.value)} disabled={idx === 0} />
+                      <input required className="input-field" placeholder="Phone" value={member.phone} onChange={(e) => handleTeamMemberChange(idx, 'phone', e.target.value)} />
+                      <input required className="input-field" placeholder="College" value={member.college} onChange={(e) => handleTeamMemberChange(idx, 'college', e.target.value)} />
+                      <select required className="input-field" value={member.standard} onChange={(e) => handleTeamMemberChange(idx, 'standard', e.target.value)}>
+                        <option value="FY">FY</option>
+                        <option value="SY">SY</option>
+                        <option value="TY">TY</option>
+                        <option value="TY">Fourth Year</option>
+                        <option value="11">11</option>
+                        <option value="12">12</option>
+                      </select>
+                      <input required className="input-field md:col-span-2" placeholder="Degree/Stream" value={member.stream} onChange={(e) => handleTeamMemberChange(idx, 'stream', e.target.value)} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex space-x-3">
+              <button type="button" onClick={() => navigate(-1)} className="btn-secondary flex-1">Back</button>
+              <button type="submit" disabled={teamLoading} className="btn-primary flex-1">{teamLoading ? 'Registering...' : 'Register Team'}</button>
+            </div>
+          </form>
+        </div>
       ) : (
         <div className="card-glow">
           <h3 className="text-lg font-semibold text-white mb-4">Registration Form</h3>
@@ -332,7 +449,7 @@ const EventRegistration: React.FC = () => {
               </label>
               <input
                 type="text"
-                {...register('fullName', { 
+                {...register('fullName', {
                   required: 'Full name is required',
                   pattern: {
                     value: /^[A-Z][a-zA-Z\s]*$/,
@@ -370,7 +487,7 @@ const EventRegistration: React.FC = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">
-                College/Institution *
+                College *
               </label>
               <input
                 type="text"
@@ -392,11 +509,12 @@ const EventRegistration: React.FC = () => {
                 className="input-field"
               >
                 <option value="">Select your standard/year</option>
-                <option value="FY">First Year (FY)</option>
-                <option value="SY">Second Year (SY)</option>
-                <option value="TY">Third Year (TY)</option>
-                <option value="11">11th Standard</option>
-                <option value="12">12th Standard</option>
+                <option value="FY">FY</option>
+                <option value="SY">SY</option>
+                <option value="TY">TY</option>
+                <option value="TY">Fourth Year</option>
+                <option value="11">11</option>
+                <option value="12">12</option>
               </select>
               {errors.standard && (
                 <p className="text-red-400 text-sm mt-1">{errors.standard.message}</p>
@@ -405,13 +523,13 @@ const EventRegistration: React.FC = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">
-                Stream/Branch *
+                Degree/Stream *
               </label>
               <input
                 type="text"
                 {...register('stream', { required: 'Stream/Branch is required' })}
                 className="input-field"
-                placeholder="e.g., Computer Science, Electronics, Mechanical, etc."
+                placeholder="e.g.,Commerce, BSCIT,BSCCS"
               />
               {errors.stream && (
                 <p className="text-red-400 text-sm mt-1">{errors.stream.message}</p>

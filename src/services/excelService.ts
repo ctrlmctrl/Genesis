@@ -1,11 +1,100 @@
+
 import ExcelJS from 'exceljs';
 // @ts-ignore
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { Participant, Event } from '../types';
+import type { Participant, Event } from '../types';
 
 export class ExcelService {
+  async exportFormattedParticipantsToExcel(participants: Participant[], event: Event): Promise<void> {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Formatted Participants');
+
+    // Define columns
+    worksheet.columns = [
+      { header: 'Sr. No', key: 'srno', width: 8, alignment: { horizontal: 'center', vertical: 'middle' } },
+      { header: 'Participant Name', key: 'name', width: 25, alignment: { horizontal: 'center', vertical: 'middle' } },
+      { header: 'College Name', key: 'college', width: 25, alignment: { horizontal: 'center', vertical: 'middle' } },
+      { header: 'Contact Number', key: 'phone', width: 15, alignment: { horizontal: 'center', vertical: 'middle' } },
+      { header: 'Team Name', key: 'teamName', width: 20, alignment: { horizontal: 'center', vertical: 'middle' } },
+      { header: 'Payment Status', key: 'paymentStatus', width: 15, alignment: { horizontal: 'center', vertical: 'middle' } },
+      { header: 'Verification Status', key: 'verificationStatus', width: 18, alignment: { horizontal: 'center', vertical: 'middle' } },
+    ];
+
+    // Center align all cells after adding data
+
+  let srno = 1;
+    if (event.isTeamEvent) {
+      // Group by team
+      const teamGroups = participants.reduce((acc, participant) => {
+        const teamName = participant.teamName || 'No Team';
+        if (!acc[teamName]) acc[teamName] = [];
+        acc[teamName].push(participant);
+        return acc;
+      }, {} as Record<string, Participant[]>);
+
+      Object.entries(teamGroups).forEach(([teamName, teamMembers]) => {
+        // Sort so team lead is first
+        teamMembers.sort((a, b) => (b.isTeamLead ? 1 : 0) - (a.isTeamLead ? 1 : 0));
+        const teamLead = teamMembers.find(m => m.isTeamLead) || teamMembers[0];
+        // Add rows for each member, but merge cells for team columns
+        const startRow = worksheet.rowCount + 1;
+        teamMembers.forEach((member, idx) => {
+          worksheet.addRow({
+            srno: idx === 0 ? srno : '',
+            name: member.fullName,
+            college: member.college,
+            phone: member.phone,
+            teamName: idx === 0 ? teamName : '',
+            paymentStatus: idx === 0 ? teamLead.paymentStatus : '',
+            verificationStatus: idx === 0 ? (teamLead.isVerified ? 'Verified' : 'Pending') : '',
+          });
+        });
+        // Merge cells for team columns
+        if (teamMembers.length > 1) {
+          worksheet.mergeCells(`A${startRow}:A${startRow + teamMembers.length - 1}`);
+          worksheet.mergeCells(`E${startRow}:E${startRow + teamMembers.length - 1}`);
+          worksheet.mergeCells(`F${startRow}:F${startRow + teamMembers.length - 1}`);
+          worksheet.mergeCells(`G${startRow}:G${startRow + teamMembers.length - 1}`);
+        }
+        srno++;
+      });
+    } else {
+      // Individual event
+      participants.forEach((p, idx) => {
+        worksheet.addRow({
+          srno: idx + 1,
+          name: p.fullName,
+          college: p.college,
+          phone: p.phone,
+          teamName: '',
+          paymentStatus: p.paymentStatus,
+          verificationStatus: p.isVerified ? 'Verified' : 'Pending',
+        });
+      });
+    }
+
+    // Style header
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+
+    // Explicitly center align all cells (including merged)
+    worksheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const data = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const fileName = `${event.title.replace(/[^a-zA-Z0-9]/g, '_')}_formatted_${new Date().toISOString().split('T')[0]}.xlsx`;
+    saveAs(data, fileName);
+  }
   async exportParticipantsToExcel(participants: Participant[], event: Event): Promise<void> {
     const workbook = new ExcelJS.Workbook();
     

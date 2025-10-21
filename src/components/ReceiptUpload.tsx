@@ -23,10 +23,10 @@ const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleFileSelect = (file: File) => {
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+    // Validate file type - only images allowed
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      toast.error('Please upload an image (JPG, PNG, WebP) or PDF file');
+      toast.error('Please upload an image (JPG, PNG, WebP)');
       return;
     }
 
@@ -161,13 +161,13 @@ const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
             onDragOver={handleDrag}
             onDrop={handleDrop}
           >
-            <input
-              type="file"
-              id="receipt-upload"
-              className="hidden"
-              accept="image/*,.pdf"
-              onChange={handleFileInput}
-            />
+                    <input
+                      type="file"
+                      id="receipt-upload"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleFileInput}
+                    />
             
             {!selectedFile ? (
               <div>
@@ -183,7 +183,7 @@ const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
                   Choose File
                 </label>
                 <p className="text-gray-500 text-xs mt-2">
-                  Supported formats: JPG, PNG, WebP, PDF (Max 5MB)
+                  Supported formats: JPG, PNG, WebP (Max 5MB)
                 </p>
               </div>
             ) : (

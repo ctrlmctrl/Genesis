@@ -15,21 +15,14 @@ const PaymentTracking: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-    const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'under_verification' | 'paid' | 'offline_paid' | 'failed'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'under_verification' | 'paid' | 'offline_paid' | 'failed'>('all');
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
   const [showPaymentVerification, setShowPaymentVerification] = useState(false);
   const [verificationIdentifier, setVerificationIdentifier] = useState('');
   const [verificationParticipant, setVerificationParticipant] = useState<Participant | null>(null);
   const [adminTransactionId, setAdminTransactionId] = useState('');
   const [verifying, setVerifying] = useState(false);
-  const [showUPIVerification, setShowUPIVerification] = useState(false);
-  const [upiTransaction, setUpiTransaction] = useState({
-    amount: '',
-    time: '',
-    upiId: '',
-    transactionId: '',
-    notes: ''
-  });
+  // UPI verification removed
   const [matchingParticipants, setMatchingParticipants] = useState<Participant[]>([]);
   const [showReceiptViewer, setShowReceiptViewer] = useState(false);
   const [selectedReceiptUrl, setSelectedReceiptUrl] = useState<string>('');
@@ -109,7 +102,7 @@ const PaymentTracking: React.FC = () => {
         status,
         status === 'paid' ? 'online' : status === 'offline_paid' ? 'offline' : undefined
       );
-      
+
       if (success) {
         toast.success(`Payment marked as ${status.replace('_', ' ')}`);
         setVerificationParticipant(null);
@@ -124,60 +117,60 @@ const PaymentTracking: React.FC = () => {
     }
   };
 
-  const handleUPITransactionSearch = () => {
-    if (!upiTransaction.amount || !upiTransaction.time) {
-      toast.error('Please enter amount and time');
-      return;
-    }
+  // const handleUPITransactionSearch = () => {
+  //   if (!upiTransaction.amount || !upiTransaction.time) {
+  //     toast.error('Please enter amount and time');
+  //     return;
+  //   }
 
-    const amount = parseFloat(upiTransaction.amount);
-    const transactionTime = new Date(upiTransaction.time);
-    
-    // Find participants with matching amount and pending status
-    const matches = participants.filter(participant => {
-      if (participant.paymentStatus !== 'pending') return false;
-      
-      const participantAmount = participant.entryFeePaid || 0;
-      const amountMatch = Math.abs(participantAmount - amount) < 0.01; // Allow for small rounding differences
-      
-      // Check if transaction time is within reasonable range (within last 24 hours)
-      const now = new Date();
-      const timeDiff = now.getTime() - transactionTime.getTime();
-      const within24Hours = timeDiff > 0 && timeDiff < 24 * 60 * 60 * 1000;
-      
-      return amountMatch && within24Hours;
-    });
+  //   const amount = parseFloat(upiTransaction.amount);
+  //   const transactionTime = new Date(upiTransaction.time);
 
-    setMatchingParticipants(matches);
-    
-    if (matches.length === 0) {
-      toast.error('No matching participants found. Check amount and time.');
-    } else {
-      toast.success(`Found ${matches.length} potential match(es)`);
-    }
-  };
+  //   // Find participants with matching amount and pending status
+  //   const matches = participants.filter(participant => {
+  //     if (participant.paymentStatus !== 'pending') return false;
 
-  const handleUPIPaymentConfirm = async (participant: Participant) => {
-    try {
-      const success = await dataService.updatePaymentStatus(
-        participant.id,
-        'paid',
-        'online'
-      );
-      
-      if (success) {
-        toast.success(`Payment confirmed for ${participant.fullName}`);
-        setMatchingParticipants([]);
-        setUpiTransaction({ amount: '', time: '', upiId: '', transactionId: '', notes: '' });
-        loadData();
-      } else {
-        toast.error('Failed to confirm payment');
-      }
-    } catch (error) {
-      console.error('Error confirming payment:', error);
-      toast.error('Failed to confirm payment');
-    }
-  };
+  //     const participantAmount = participant.entryFeePaid || 0;
+  //     const amountMatch = Math.abs(participantAmount - amount) < 0.01; // Allow for small rounding differences
+
+  //     // Check if transaction time is within reasonable range (within last 24 hours)
+  //     const now = new Date();
+  //     const timeDiff = now.getTime() - transactionTime.getTime();
+  //     const within24Hours = timeDiff > 0 && timeDiff < 24 * 60 * 60 * 1000;
+
+  //     return amountMatch && within24Hours;
+  //   });
+
+  //   setMatchingParticipants(matches);
+
+  //   if (matches.length === 0) {
+  //     toast.error('No matching participants found. Check amount and time.');
+  //   } else {
+  //     toast.success(`Found ${matches.length} potential match(es)`);
+  //   }
+  // };
+
+  // const handleUPIPaymentConfirm = async (participant: Participant) => {
+  //   try {
+  //     const success = await dataService.updatePaymentStatus(
+  //       participant.id,
+  //       'paid',
+  //       'online'
+  //     );
+
+  //     if (success) {
+  //       toast.success(`Payment confirmed for ${participant.fullName}`);
+  //       setMatchingParticipants([]);
+  //       setUpiTransaction({ amount: '', time: '', upiId: '', transactionId: '', notes: '' });
+  //       loadData();
+  //     } else {
+  //       toast.error('Failed to confirm payment');
+  //     }
+  //   } catch (error) {
+  //     console.error('Error confirming payment:', error);
+  //     toast.error('Failed to confirm payment');
+  //   }
+  // };
 
   const handleViewReceipt = (receiptUrl: string) => {
     setSelectedReceiptUrl(receiptUrl);
@@ -232,17 +225,22 @@ const PaymentTracking: React.FC = () => {
   };
 
   const filteredParticipants = participants.filter(participant => {
+    const isTeamRegistration = !!participant.teamId;
+    // Show only individual participants or team leads
+    if (isTeamRegistration && !participant.isTeamLead) {
+      return false; // hide team members
+    }
     const matchesSearch = participant.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         participant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         participant.phone.includes(searchTerm);
-    
+      participant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      participant.phone.includes(searchTerm);
+
     const matchesStatus = filterStatus === 'all' || participant.paymentStatus === filterStatus;
     const matchesEvent = selectedEvent === 'all' || participant.eventId === selectedEvent;
-    
+
     return matchesSearch && matchesStatus && matchesEvent;
   }).sort((a, b) => {
     let comparison = 0;
-    
+
     switch (sortBy) {
       case 'time':
         comparison = new Date(a.registrationDate).getTime() - new Date(b.registrationDate).getTime();
@@ -256,7 +254,7 @@ const PaymentTracking: React.FC = () => {
       default:
         comparison = 0;
     }
-    
+
     return sortOrder === 'asc' ? comparison : -comparison;
   });
 
@@ -351,117 +349,7 @@ const PaymentTracking: React.FC = () => {
         </div>
       </div>
 
-      {/* UPI Transaction Verification */}
-      <div className="card-glow mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-white">UPI Transaction Verification</h2>
-          <button
-            onClick={() => setShowUPIVerification(!showUPIVerification)}
-            className="btn-secondary text-sm"
-          >
-            {showUPIVerification ? 'Hide' : 'Show'} UPI Verification
-          </button>
-        </div>
-        
-        {showUPIVerification && (
-          <div className="space-y-4">
-            <p className="text-gray-400 text-sm">
-              Enter UPI transaction details to find matching participants. This helps when you only have transaction ID from UPI app.
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Amount Received (₹)</label>
-                <input
-                  type="number"
-                  value={upiTransaction.amount}
-                  onChange={(e) => setUpiTransaction({ ...upiTransaction, amount: e.target.value })}
-                  placeholder="e.g., 500"
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Transaction Time</label>
-                <input
-                  type="datetime-local"
-                  value={upiTransaction.time}
-                  onChange={(e) => setUpiTransaction({ ...upiTransaction, time: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">UPI ID (Optional)</label>
-                <input
-                  type="text"
-                  value={upiTransaction.upiId}
-                  onChange={(e) => setUpiTransaction({ ...upiTransaction, upiId: e.target.value })}
-                  placeholder="e.g., genesis@upi"
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Transaction ID (Optional)</label>
-                <input
-                  type="text"
-                  value={upiTransaction.transactionId}
-                  onChange={(e) => setUpiTransaction({ ...upiTransaction, transactionId: e.target.value })}
-                  placeholder="e.g., TXN123456789"
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-            
-            <button
-              onClick={handleUPITransactionSearch}
-              className="btn-primary"
-            >
-              Find Matching Participants
-            </button>
-            
-            {matchingParticipants.length > 0 && (
-              <div className="mt-4 space-y-3">
-                <h3 className="text-lg font-semibold text-white">Potential Matches:</h3>
-                {matchingParticipants.map((participant) => {
-                  const event = events.find(e => e.id === participant.eventId);
-                  return (
-                    <div key={participant.id} className="bg-gray-700 rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="text-white font-semibold">{participant.fullName}</h4>
-                          <p className="text-gray-400 text-sm">{participant.email}</p>
-                          <p className="text-gray-400 text-sm">{participant.phone}</p>
-                          {event && <p className="text-cyan-400 text-sm">{event.title}</p>}
-                        </div>
-                        <div className="text-right">
-                          <p className="text-white font-semibold">₹{participant.entryFeePaid || 0}</p>
-                          <p className="text-gray-400 text-xs">
-                            {new Date(participant.registrationDate).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm text-gray-400">
-                          Participant ID: <span className="font-mono">{participant.id.slice(-8)}</span>
-                        </div>
-                        <button
-                          onClick={() => handleUPIPaymentConfirm(participant)}
-                          className="btn-primary text-sm"
-                        >
-                          Confirm Payment
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {/* UPI Transaction Verification removed */}
 
       {/* Payment Verification */}
       <div className="card-glow mb-6">
@@ -486,7 +374,7 @@ const PaymentTracking: React.FC = () => {
               </button>
             </div>
           </div>
-          
+
           {verificationParticipant && (
             <div className="bg-gray-700 rounded-lg p-4">
               <h3 className="text-lg font-semibold text-white mb-2">Participant Found</h3>
@@ -494,7 +382,7 @@ const PaymentTracking: React.FC = () => {
                 <p><strong className="text-gray-300">Name:</strong> <span className="text-white">{verificationParticipant.fullName}</span></p>
                 <p><strong className="text-gray-300">Email:</strong> <span className="text-white">{verificationParticipant.email}</span></p>
                 <p><strong className="text-gray-300">Phone:</strong> <span className="text-white">{verificationParticipant.phone}</span></p>
-                <p><strong className="text-gray-300">Current Status:</strong> 
+                <p><strong className="text-gray-300">Current Status:</strong>
                   <span className={`ml-2 px-2 py-1 rounded text-xs ${getStatusColor(verificationParticipant.paymentStatus)}`}>
                     {verificationParticipant.paymentStatus.replace('_', ' ')}
                   </span>
@@ -503,7 +391,7 @@ const PaymentTracking: React.FC = () => {
                   <p><strong className="text-gray-300">Amount:</strong> <span className="text-white">₹{verificationParticipant.entryFeePaid}</span></p>
                 )}
               </div>
-              
+
               {verificationParticipant.paymentStatus === 'pending' && (
                 <div className="mt-4 flex space-x-2">
                   <button
@@ -526,53 +414,53 @@ const PaymentTracking: React.FC = () => {
                   </button>
                 </div>
               )}
-                {/* Admin-only transaction ID entry and duplicate check */}
-                <div className="mt-4">
-                  <label className="block text-sm text-gray-300 mb-2">Transaction ID (admin only)</label>
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      value={adminTransactionId}
-                      onChange={(e) => setAdminTransactionId(e.target.value)}
-                      placeholder="e.g., TXN123456789 or bank reference"
-                      className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400"
-                    />
-                    <button
-                      onClick={async () => {
-                        if (!verificationParticipant) return;
-                        if (!adminTransactionId.trim()) {
-                          toast.error('Enter a transaction ID first');
-                          return;
-                        }
+              {/* Admin-only transaction ID entry and duplicate check */}
+              <div className="mt-4">
+                <label className="block text-sm text-gray-300 mb-2">Transaction ID (admin only)</label>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={adminTransactionId}
+                    onChange={(e) => setAdminTransactionId(e.target.value)}
+                    placeholder="e.g., TXN123456789 or bank reference"
+                    className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400"
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!verificationParticipant) return;
+                      if (!adminTransactionId.trim()) {
+                        toast.error('Enter a transaction ID first');
+                        return;
+                      }
 
-                        // Check for duplicates
-                        const duplicate = participants.find(p => p.transactionId === adminTransactionId.trim() && p.id !== verificationParticipant.id);
-                        if (duplicate) {
-                          toast.error('Duplicate transaction ID found: another participant has the same transaction ID');
-                          return;
-                        }
+                      // Check for duplicates
+                      const duplicate = participants.find(p => p.transactionId === adminTransactionId.trim() && p.id !== verificationParticipant.id);
+                      if (duplicate) {
+                        toast.error('Duplicate transaction ID found: another participant has the same transaction ID');
+                        return;
+                      }
 
-                        try {
-                          const updated = await dataService.updatePaymentStatus(verificationParticipant.id, 'paid', 'online', verificationParticipant.receiptUrl, adminTransactionId.trim());
-                          if (updated) {
-                            toast.success('Transaction ID saved and payment marked as paid');
-                            setVerificationParticipant(updated);
-                            setAdminTransactionId('');
-                            loadData();
-                          } else {
-                            toast.error('Failed to update participant');
-                          }
-                        } catch (err) {
-                          console.error('Error saving transaction ID:', err);
-                          toast.error('Failed to save transaction ID');
+                      try {
+                        const updated = await dataService.updatePaymentStatus(verificationParticipant.id, 'paid', 'online', verificationParticipant.receiptUrl, adminTransactionId.trim());
+                        if (updated) {
+                          toast.success('Transaction ID saved and payment marked as paid');
+                          setVerificationParticipant(updated);
+                          setAdminTransactionId('');
+                          loadData();
+                        } else {
+                          toast.error('Failed to update participant');
                         }
-                      }}
-                      className="btn-primary text-sm"
-                    >
-                      Save & Verify
-                    </button>
-                  </div>
+                      } catch (err) {
+                        console.error('Error saving transaction ID:', err);
+                        toast.error('Failed to save transaction ID');
+                      }
+                    }}
+                    className="btn-primary text-sm"
+                  >
+                    Save & Verify
+                  </button>
                 </div>
+              </div>
             </div>
           )}
         </div>
@@ -594,7 +482,7 @@ const PaymentTracking: React.FC = () => {
               />
             </div>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Payment Status</label>
             <select
@@ -610,7 +498,7 @@ const PaymentTracking: React.FC = () => {
               <option value="failed">Failed</option>
             </select>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Event</label>
             <select
@@ -624,7 +512,7 @@ const PaymentTracking: React.FC = () => {
               ))}
             </select>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Sort By</label>
             <select
@@ -637,7 +525,7 @@ const PaymentTracking: React.FC = () => {
               <option value="name">Name</option>
             </select>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Order</label>
             <select
@@ -674,13 +562,13 @@ const PaymentTracking: React.FC = () => {
                       <p className="text-sm text-cyan-400 mt-1">{event.title}</p>
                     )}
                   </div>
-                  
+
                   <div className="flex flex-col items-end space-y-2">
                     <div className={`px-3 py-1 rounded-full text-sm font-medium flex items-center border ${getStatusColor(participant.paymentStatus)}`}>
                       {getStatusIcon(participant.paymentStatus)}
                       <span className="ml-2 capitalize">{participant.paymentStatus.replace('_', ' ')}</span>
                     </div>
-                    
+
                     {participant.isVerified && (
                       <div className="px-2 py-1 rounded-full text-xs font-medium text-green-400 bg-green-400/10 flex items-center">
                         <CheckCircle className="h-3 w-3 mr-1" />
@@ -689,7 +577,7 @@ const PaymentTracking: React.FC = () => {
                     )}
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
                     <strong className="text-gray-300">College:</strong>
@@ -707,7 +595,7 @@ const PaymentTracking: React.FC = () => {
                     <strong className="text-gray-300">Registration:</strong>
                     <span className="ml-2 text-white">{new Date(participant.registrationDate).toLocaleDateString()}</span>
                   </div>
-                  
+
                   <div className="md:col-span-2">
                     <strong className="text-gray-300">Participant ID:</strong>
                     <div className="flex items-center mt-1">
@@ -719,18 +607,18 @@ const PaymentTracking: React.FC = () => {
                         className="ml-2 p-1 hover:bg-gray-600 rounded transition-colors"
                         title="Copy Participant ID"
                       >
-                          <Copy className="h-4 w-4 text-gray-400" />
-                        </button>
-                      </div>
+                        <Copy className="h-4 w-4 text-gray-400" />
+                      </button>
                     </div>
-                  
+                  </div>
+
                   {participant.entryFeePaid && (
                     <div>
                       <strong className="text-gray-300">Amount Paid:</strong>
                       <span className="ml-2 text-white">₹{participant.entryFeePaid}</span>
                     </div>
                   )}
-                  
+
                   {participant.registrationType && (
                     <div>
                       <strong className="text-gray-300">Registration Type:</strong>
@@ -743,7 +631,7 @@ const PaymentTracking: React.FC = () => {
                       <span className="ml-2 font-mono text-white">{participant.transactionId}</span>
                     </div>
                   )}
-                  
+
                   {participant.receiptUrl && (
                     <div>
                       <strong className="text-gray-300">Receipt:</strong>
@@ -776,7 +664,7 @@ const PaymentTracking: React.FC = () => {
                 <X className="h-5 w-5 text-gray-400" />
               </button>
             </div>
-            
+
             <div className="p-4 overflow-auto max-h-[calc(90vh-80px)]">
               {selectedReceiptUrl.includes('.pdf') ? (
                 <div className="text-center">

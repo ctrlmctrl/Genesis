@@ -2,12 +2,12 @@ import { Event, Participant, ParticipantInfo, VerificationRecord } from '../type
 import { localStorageService } from './localStorageService';
 import { QRCodeService } from './qrCodeService';
 import { emailService } from './emailService';
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  getDocs, 
-  getDoc, 
+import {
+  collection,
+  doc,
+  addDoc,
+  getDocs,
+  getDoc,
   updateDoc,
   query,
   where,
@@ -17,7 +17,7 @@ import { db } from '../firebase';
 
 // Storage mode: 'firebase' | 'localStorage' | 'memory'
 // Use Firebase for production, localStorage for development
-const STORAGE_MODE = process.env.REACT_APP_STORAGE_MODE || 
+const STORAGE_MODE = process.env.REACT_APP_STORAGE_MODE ||
   (process.env.NODE_ENV === 'production' ? 'firebase' : 'localStorage');
 
 class DataService {
@@ -41,7 +41,7 @@ class DataService {
         this.events = localStorageService.getEvents();
         this.participants = localStorageService.getParticipants();
         this.verificationRecords = localStorageService.getVerificationRecords();
-        
+
         // Only create sample data in development mode
         if (this.events.length === 0 && process.env.NODE_ENV === 'development') {
           this.initializeSampleData();
@@ -166,7 +166,7 @@ class DataService {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
-        
+
         const event: Event = {
           ...eventData,
           id: docRef.id,
@@ -174,7 +174,7 @@ class DataService {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        
+
         return event;
       } catch (error) {
         console.error('Error creating event in Firebase:', error);
@@ -188,7 +188,7 @@ class DataService {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      
+
       this.events.push(event);
       this.saveDataToStorage();
       return event;
@@ -302,7 +302,7 @@ class DataService {
 
     const participantId = this.generateId();
     const uniqueQRCode = QRCodeService.generateUniqueQRCode();
-    
+
     const participant: Participant = {
       ...participantData,
       id: participantId,
@@ -346,7 +346,7 @@ class DataService {
       }
 
       const uniqueQRCode = QRCodeService.generateUniqueQRCode();
-      
+
       const participantDoc = {
         ...participantData,
         registrationDate: new Date().toISOString(),
@@ -362,7 +362,7 @@ class DataService {
       };
 
       const docRef = await addDoc(collection(db, 'participants'), participantDoc);
-      
+
       const participant: Participant = {
         id: docRef.id,
         eventId: participantDoc.eventId,
@@ -419,13 +419,13 @@ class DataService {
   async getParticipantByQRCode(qrCode: string): Promise<Participant | null> {
     console.log('Looking up participant with QR code:', qrCode);
     console.log('Using Firebase:', this.useFirebase);
-    
+
     if (this.useFirebase) {
       try {
         const q = query(collection(db, 'participants'), where('qrCode', '==', qrCode));
         const querySnapshot = await getDocs(q);
         console.log('Firebase query result:', querySnapshot.docs.length, 'documents found');
-        
+
         if (!querySnapshot.empty) {
           const doc = querySnapshot.docs[0];
           const participant = { id: doc.id, ...doc.data() } as Participant;
@@ -439,7 +439,7 @@ class DataService {
         return null;
       }
     }
-    
+
     console.log('Searching in localStorage participants:', this.participants.length);
     const found = this.participants.find(p => p.qrCode === qrCode) || null;
     console.log('Found participant in localStorage:', found);
@@ -534,7 +534,7 @@ class DataService {
       const member = teamMembers[i];
       const participantId = this.generateId();
       const uniqueQRCode = QRCodeService.generateUniqueQRCode();
-      
+
       const participant: Participant = {
         id: participantId,
         eventId,
@@ -577,10 +577,13 @@ class DataService {
         throw new Error('This is not a team event');
       }
 
-    const requiredMembers = event.membersPerTeam || 1;
-    if (teamMembers.length !== requiredMembers) {
-      throw new Error(`Team must have exactly ${requiredMembers} members`);
-    }
+      const requiredMembers = event.membersPerTeam || 1;
+      if (teamMembers.length < 1) {
+        throw new Error('Team must have at least one member');
+      }
+      if (teamMembers.length > requiredMembers) {
+        throw new Error(`Team cannot have more than ${requiredMembers} members`);
+      }
 
       const teamId = `team-${Date.now()}`;
       const registeredMembers: Participant[] = [];
@@ -588,7 +591,7 @@ class DataService {
       for (let i = 0; i < teamMembers.length; i++) {
         const member = teamMembers[i];
         const uniqueQRCode = QRCodeService.generateUniqueQRCode();
-        
+
         // Only add optional fields if they are defined
         const participantDoc: any = {
           eventId,
@@ -613,7 +616,7 @@ class DataService {
         if ((member as any).assignedRoom !== undefined) participantDoc.assignedRoom = (member as any).assignedRoom;
 
         const docRef = await addDoc(collection(db, 'participants'), participantDoc);
-        
+
         const participant: Participant = {
           id: docRef.id,
           eventId: participantDoc.eventId,
@@ -627,6 +630,9 @@ class DataService {
           qrCode: participantDoc.qrCode,
           isVerified: participantDoc.isVerified,
           paymentStatus: participantDoc.paymentStatus,
+          paymentMethod: participantDoc.paymentMethod,
+          receiptUrl: participantDoc.receiptUrl,
+          verificationTime: participantDoc.verificationTime,
           teamId: participantDoc.teamId,
           teamName: participantDoc.teamName,
           isTeamLead: participantDoc.isTeamLead,
@@ -674,8 +680,8 @@ class DataService {
     const oldStatus = this.participants[participantIndex].paymentStatus;
     this.participants[participantIndex].paymentStatus = paymentStatus;
     if (paymentMethod) this.participants[participantIndex].paymentMethod = paymentMethod;
-  if (receiptUrl) this.participants[participantIndex].receiptUrl = receiptUrl;
-  if (transactionId) this.participants[participantIndex].transactionId = transactionId;
+    if (receiptUrl) this.participants[participantIndex].receiptUrl = receiptUrl;
+    if (transactionId) this.participants[participantIndex].transactionId = transactionId;
 
     // Send email notification if status changed to verified or failed
     if (oldStatus !== paymentStatus && (paymentStatus === 'paid' || paymentStatus === 'offline_paid' || paymentStatus === 'failed')) {
@@ -690,11 +696,11 @@ class DataService {
     try {
       const participantRef = doc(db, 'participants', participantId);
       const participantDoc = await getDoc(participantRef);
-      
+
       if (!participantDoc.exists()) {
         return null;
       }
-      
+
       const participantData = participantDoc.data() as Participant;
       const oldStatus = participantData.paymentStatus;
 
@@ -757,7 +763,7 @@ class DataService {
   // Registration Control Validation
   private checkRegistrationAvailability(event: Event, userRole?: string): { allowed: boolean; reason: string } {
     const now = new Date();
-    
+
     // Check day-wise controls first
     if (event.dayWiseControls) {
       const dayControl = event.dayWiseControls[event.eventDay];
@@ -767,7 +773,7 @@ class DataService {
           reason: `Registration is currently closed for ${event.eventDay} events`
         };
       }
-      
+
       if (dayControl?.registrationEndDate && dayControl?.registrationEndTime) {
         const endDateTime = new Date(`${dayControl.registrationEndDate}T${dayControl.registrationEndTime}`);
         if (now > endDateTime && !dayControl.allowLateRegistration) {
@@ -778,7 +784,7 @@ class DataService {
         }
       }
     }
-    
+
     // Check event-specific registration deadline
     if (event.registrationEndDate && event.registrationEndTime) {
       const endDateTime = new Date(`${event.registrationEndDate}T${event.registrationEndTime}`);
@@ -787,23 +793,23 @@ class DataService {
         if (event.registrationControls?.allowAfterDeadline) {
           return { allowed: true, reason: 'Late registration allowed' };
         }
-        
+
         // Check role-based permissions
         if (userRole === 'admin' && event.registrationControls?.allowAfterDeadlineForAdmins) {
           return { allowed: true, reason: 'Admin late registration allowed' };
         }
-        
+
         if (userRole === 'volunteer' && event.registrationControls?.allowAfterDeadlineForVolunteers) {
           return { allowed: true, reason: 'Volunteer late registration allowed' };
         }
-        
+
         return {
           allowed: false,
           reason: 'Registration deadline has passed'
         };
       }
     }
-    
+
     // Check if registration is within allowed time window
     if (event.registrationStartDate && event.registrationStartTime) {
       const startDateTime = new Date(`${event.registrationStartDate}T${event.registrationStartTime}`);
@@ -814,7 +820,7 @@ class DataService {
         };
       }
     }
-    
+
     return { allowed: true, reason: 'Registration is available' };
   }
 
@@ -857,11 +863,11 @@ class DataService {
         verificationTime: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      
+
       if (assignedRoom) {
         updateData.assignedRoom = assignedRoom;
       }
-      
+
       await updateDoc(participantRef, updateData);
 
       // Create verification record
@@ -890,7 +896,7 @@ class DataService {
   async getEventStats(eventId: string) {
     const participants = this.participants.filter(p => p.eventId === eventId);
     const verified = participants.filter(p => p.isVerified);
-    
+
     return {
       totalParticipants: participants.length,
       verifiedParticipants: verified.length,

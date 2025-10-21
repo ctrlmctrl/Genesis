@@ -172,20 +172,7 @@ const EventParticipants: React.FC = () => {
     }
   };
 
-  const handleExportToPDF = async () => {
-    if (!event || participants.length === 0) return;
-    
-    try {
-      setExporting(true);
-      await excelService.exportParticipantsToPDF(participants, event);
-      toast.success('PDF exported successfully!');
-    } catch (error) {
-      console.error('Error exporting PDF:', error);
-      toast.error('Failed to export PDF');
-    } finally {
-      setExporting(false);
-    }
-  };
+
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -283,14 +270,6 @@ const EventParticipants: React.FC = () => {
             >
               <Download className="h-4 w-4 mr-2" />
               {exporting ? 'Exporting...' : 'Export Excel'}
-            </button>
-            <button
-              onClick={handleExportToPDF}
-              disabled={exporting}
-              className="btn-secondary flex items-center"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {exporting ? 'Exporting...' : 'Export PDF'}
             </button>
           </div>
         )}

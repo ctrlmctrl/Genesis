@@ -61,7 +61,7 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!teamName.trim()) {
       toast.error('Please enter a team name');
       return;
@@ -71,31 +71,31 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
     for (let i = 0; i < teamMembers.length; i++) {
       const member = teamMembers[i];
       const isTeamLead = i === 0;
-      
+
       // Check required fields (email is optional for team lead, required for others)
       if (!member.fullName.trim() || !member.phone.trim() || !member.college.trim() || !member.standard || !member.stream.trim()) {
         toast.error(`Please fill all details for team member ${i + 1}`);
         return;
       }
-      
+
       // Email validation: required for non-team-lead members
       if (!isTeamLead && !member.email.trim()) {
         toast.error(`Email is required for team member ${i + 1}`);
         return;
       }
-      
+
       // Email format validation for non-team-lead members
       if (!isTeamLead && member.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(member.email)) {
         toast.error(`Please enter a valid email for team member ${i + 1}`);
         return;
       }
-      
+
       // Validate name format
       if (!validateName(member.fullName)) {
         toast.error(`Name for team member ${i + 1} must start with a capital letter`);
         return;
       }
-      
+
       // Validate phone format
       if (!validatePhone(member.phone)) {
         toast.error(`Phone number for team member ${i + 1} must be 10 digits starting with 6, 7, 8, or 9`);
@@ -110,7 +110,7 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
         ...member,
         email: index === 0 ? (user?.email || '') : member.email // Team lead uses authenticated user's email
       }));
-      
+
       const participants = await dataService.registerTeam(event.id, teamName, teamMembersWithEmail);
       toast.success(`Team "${teamName}" registered successfully!`);
       onSuccess(participants);
@@ -134,8 +134,7 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
-      >
-        <div className="flex items-center justify-between mb-6">
+      >        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
             <Users className="h-6 w-6 text-cyan-400 mr-3" />
             <h2 className="text-2xl font-bold text-white">Team Registration</h2>

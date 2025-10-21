@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
-  Plus, 
-  Users, 
-  Calendar, 
-  BarChart3, 
-  LogOut, 
+import {
+  Plus,
+  Users,
+  Calendar,
+  BarChart3,
+  LogOut,
   Download,
   Eye,
   Edit,
@@ -16,7 +16,7 @@ import {
   Shield
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Event } from '../types';
+import { Participant, Event } from '../types';
 import { dataService } from '../services/dataService';
 import { excelService } from '../services/excelService';
 import { eventLeadExportService } from '../services/eventLeadExportService';
@@ -29,6 +29,7 @@ import RegistrationControls from '../components/RegistrationControls';
 const AdminPage: React.FC = () => {
   const navigate = useNavigate();
   const [adminUser, setAdminUser] = useState<RoleUser | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [loginForm, setLoginForm] = useState({ userId: '' });
   const [events, setEvents] = useState<Event[]>([]);
@@ -54,8 +55,8 @@ const AdminPage: React.FC = () => {
     onSpotEndTime: '10:00',
   });
   const [eventDates, setEventDates] = useState({
-    day1Date: '2024-11-13',
-    day2Date: '2024-11-14',
+    day1Date: '2025-11-14',
+    day2Date: '2025-11-15',
     day1Time: '10:00',
     day2Time: '10:00',
   });
@@ -77,14 +78,18 @@ const AdminPage: React.FC = () => {
 
   const setupEventListeners = () => {
     // Check if we're using Firebase (production) or localStorage (development)
-    const isFirebase = process.env.REACT_APP_STORAGE_MODE === 'firebase' || 
-                      (process.env.NODE_ENV === 'production' && !process.env.REACT_APP_STORAGE_MODE);
+    const isFirebase = process.env.REACT_APP_STORAGE_MODE === 'firebase' ||
+      (process.env.NODE_ENV === 'production' && !process.env.REACT_APP_STORAGE_MODE);
 
     if (isFirebase) {
       // Use real-time listener for Firebase
       const unsubscribe = realtimeService.listenToEvents((eventsData) => {
         setEvents(eventsData);
         setLoading(false);
+      });
+
+      const unsubscribeParticipants = realtimeService.listenToParticipants((participantsData) => {
+        setParticipants(participantsData);
       });
 
       // Test Firebase connection
@@ -96,7 +101,10 @@ const AdminPage: React.FC = () => {
         }
       });
 
-      return unsubscribe;
+      return () => {
+        unsubscribe();
+        unsubscribeParticipants();
+      };
     } else {
       // Fallback to regular data loading for development
       loadEvents();
@@ -105,7 +113,11 @@ const AdminPage: React.FC = () => {
 
   const loadEvents = async () => {
     try {
-      const eventsData = await dataService.getEvents();
+      const [participantsData, eventsData] = await Promise.all([
+        dataService.getParticipants(),
+        dataService.getEvents()
+      ]);
+      setParticipants(participantsData);
       setEvents(eventsData);
     } catch (error) {
       console.error('Error loading events:', error);
@@ -117,19 +129,19 @@ const AdminPage: React.FC = () => {
 
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       // Set date and time based on eventDay and current date settings
       const eventDate = newEvent.eventDay === 'day1' ? eventDates.day1Date : eventDates.day2Date;
       const eventTime = newEvent.eventDay === 'day1' ? eventDates.day1Time : eventDates.day2Time;
-      
+
       await dataService.createEvent({
         ...newEvent,
         date: eventDate,
         time: eventTime,
         isActive: true,
       });
-      
+
       toast.success('Event created successfully!');
       setShowCreateForm(false);
       setNewEvent({
@@ -150,7 +162,7 @@ const AdminPage: React.FC = () => {
         onSpotStartTime: '08:00',
         onSpotEndTime: '10:00',
       });
-      
+
       // Events will be updated automatically via real-time listener
     } catch (error) {
       console.error('Error creating event:', error);
@@ -183,21 +195,21 @@ const AdminPage: React.FC = () => {
 
   const handleUpdateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!editingEvent) return;
-    
+
     try {
       // Set date and time automatically based on eventDay
-      const eventDate = newEvent.eventDay === 'day1' ? '2024-11-13' : '2024-11-14';
+      const eventDate = newEvent.eventDay === 'day1' ? '2025-11-14' : '2025-11-15';
       const eventTime = '10:00'; // Default time
-      
+
       await dataService.updateEvent(editingEvent.id, {
         ...newEvent,
         date: eventDate,
         time: eventTime,
         isActive: true,
       });
-      
+
       toast.success('Event updated successfully!');
       setShowEditForm(false);
       setEditingEvent(null);
@@ -219,7 +231,7 @@ const AdminPage: React.FC = () => {
         onSpotStartTime: '08:00',
         onSpotEndTime: '10:00',
       });
-      
+
       // Events will be updated automatically via real-time listener
     } catch (error) {
       console.error('Error updating event:', error);
@@ -324,9 +336,9 @@ const AdminPage: React.FC = () => {
         },
         updatedAt: new Date().toISOString()
       };
-      
+
       await dataService.updateEvent(event.id, updatedEvent);
-      
+
       const status = updatedEvent.dailyRegistrationClosure?.[date] ? 'closed' : 'opened';
       toast.success(`Registration ${status} for ${date}`);
     } catch (error) {
@@ -342,7 +354,7 @@ const AdminPage: React.FC = () => {
         onSpotEntryFee: newPrice,
         updatedAt: new Date().toISOString()
       };
-      
+
       await dataService.updateEvent(event.id, updatedEvent);
       toast.success(`On-the-spot pricing updated to ₹${newPrice}`);
     } catch (error) {
@@ -386,13 +398,13 @@ const AdminPage: React.FC = () => {
     e.preventDefault();
     try {
       const user = await roleAuthService.login(loginForm.userId);
-      
+
       // Check if user has admin role
       if (user.role !== 'admin') {
         toast.error('Access denied. Admin privileges required.');
         return;
       }
-      
+
       setAdminUser(user);
       setIsAdminAuthenticated(true);
       toast.success(`Welcome, ${user.username}!`);
@@ -419,6 +431,25 @@ const AdminPage: React.FC = () => {
       year: 'numeric'
     });
   };
+
+  const revenue = events.reduce((sum, event) => {
+    // Get participants for this event
+    const eventParticipants = participants.filter(p =>
+      p.eventId.toString() === event.id.toString() &&
+      (p.paymentStatus === "paid" || p.paymentStatus === "offline_paid") // check both paid statuses
+    );
+    console.log("eventParticipants:", eventParticipants);
+
+    const individualRevenue = eventParticipants
+      .filter(p => !p.teamId) // individual participants
+      .reduce((acc, p) => acc + (p.entryFeePaid || 0), 0);
+    console.log("Individual Revenue:", individualRevenue);
+    const teamRevenue = eventParticipants
+      .filter(p => p.teamId && p.isTeamLead) // only team leads
+      .reduce((acc, p) => acc + (p.entryFeePaid || 0), 0);
+    console.log("Team Revenue:", teamRevenue);
+    return sum + individualRevenue + teamRevenue;
+  }, 0);
 
   if (loading) {
     return (
@@ -464,10 +495,10 @@ const AdminPage: React.FC = () => {
       <div className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-                <div className="flex items-center">
-                  <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
-                  <span className="ml-4 text-gray-400">Welcome, {adminUser?.username || 'Admin'}</span>
-                </div>
+            <div className="flex items-center">
+              <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+              <span className="ml-4 text-gray-400">Welcome, {adminUser?.username || 'Admin'}</span>
+            </div>
             <div className="flex items-center space-x-4">
               <Link
                 to="/admin/payments"
@@ -490,13 +521,6 @@ const AdminPage: React.FC = () => {
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Export Excel
-                </button>
-                <button
-                  onClick={handleExportAllToPDF}
-                  className="btn-secondary flex items-center"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export PDF
                 </button>
               </div>
               <button
@@ -552,7 +576,7 @@ const AdminPage: React.FC = () => {
               <div>
                 <p className="text-purple-100">Revenue</p>
                 <p className="text-3xl font-bold">
-                  ₹{events.reduce((sum, event) => sum + (event.currentParticipants * event.entryFee), 0)}
+                  ₹{revenue}
                 </p>
               </div>
               <DollarSign className="h-8 w-8 text-purple-200" />
@@ -596,7 +620,7 @@ const AdminPage: React.FC = () => {
             exit={{ opacity: 0, height: 0 }}
           >
             <h3 className="text-xl font-semibold text-white mb-6">Create New Event</h3>
-            
+
             <form onSubmit={handleCreateEvent} className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -649,7 +673,6 @@ const AdminPage: React.FC = () => {
                   onChange={(e) => setNewEvent({ ...newEvent, entryFee: parseFloat(e.target.value) })}
                   className="input-field"
                   min="0"
-                  step="0.01"
                   required
                 />
               </div>
@@ -667,6 +690,20 @@ const AdminPage: React.FC = () => {
                   <option value="day1">Day 1</option>
                   <option value="day2">Day 2</option>
                 </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={newEvent.isTeamEvent}
+                      onChange={(e) => setNewEvent({ ...newEvent, isTeamEvent: e.target.checked })}
+                      className="mr-2"
+                    />
+                    <span className="text-gray-300">Team Event</span>
+                  </label>
+                </div>
               </div>
 
               {newEvent.isTeamEvent && (
@@ -746,7 +783,6 @@ const AdminPage: React.FC = () => {
                       onChange={(e) => setNewEvent({ ...newEvent, onSpotEntryFee: parseFloat(e.target.value) || 0 })}
                       className="input-field"
                       min="0"
-                      step="0.01"
                       placeholder="Enter on-the-spot fee"
                     />
                   </div>
@@ -820,7 +856,7 @@ const AdminPage: React.FC = () => {
             exit={{ opacity: 0, height: 0 }}
           >
             <h3 className="text-xl font-semibold text-white mb-6">Edit Event</h3>
-            
+
             <form onSubmit={handleUpdateEvent} className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-300 mb-2">Event Title</label>
@@ -832,7 +868,7 @@ const AdminPage: React.FC = () => {
                   required
                 />
               </div>
-              
+
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
                 <textarea
@@ -843,7 +879,7 @@ const AdminPage: React.FC = () => {
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Room No. (Optional)</label>
                 <input
@@ -854,7 +890,7 @@ const AdminPage: React.FC = () => {
                   placeholder="e.g., Room 101, Hall A, etc. (Leave empty if not assigned yet)"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Entry Fee (₹)</label>
                 <input
@@ -865,7 +901,7 @@ const AdminPage: React.FC = () => {
                   min="0"
                 />
               </div>
-              
+
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Event Day</label>
@@ -891,7 +927,7 @@ const AdminPage: React.FC = () => {
                   />
                 </div>
               )}
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Payment Method</label>
                 <select
@@ -904,7 +940,7 @@ const AdminPage: React.FC = () => {
                   <option value="both">Both</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">UPI ID</label>
                 <input
@@ -949,7 +985,6 @@ const AdminPage: React.FC = () => {
                       onChange={(e) => setNewEvent({ ...newEvent, onSpotEntryFee: parseFloat(e.target.value) || 0 })}
                       className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                       min="0"
-                      step="0.01"
                       placeholder="Enter on-the-spot fee"
                     />
                   </div>
@@ -994,7 +1029,7 @@ const AdminPage: React.FC = () => {
                   </div>
                 </>
               )}
-              
+
               <div className="md:col-span-2">
                 <div className="flex items-center space-x-4">
                   <label className="flex items-center">
@@ -1006,10 +1041,10 @@ const AdminPage: React.FC = () => {
                     />
                     <span className="text-gray-300">Team Event</span>
                   </label>
-                  
+
                 </div>
               </div>
-              
+
               <div className="md:col-span-2 flex space-x-4">
                 <button
                   type="submit"
@@ -1035,7 +1070,7 @@ const AdminPage: React.FC = () => {
         {/* Events List */}
         <div className="space-y-6">
           <h2 className="text-2xl font-semibold text-white">Events Management</h2>
-          
+
           {events.length === 0 ? (
             <div className="bg-gray-800 rounded-xl p-12 text-center">
               <Calendar className="h-16 w-16 mx-auto mb-4 text-gray-400" />
@@ -1059,9 +1094,9 @@ const AdminPage: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  
+
                   <p className="text-gray-400 mb-4 line-clamp-2">{event.description}</p>
-                  
+
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center text-sm text-gray-400">
                       <Calendar className="h-4 w-4 mr-2" />
@@ -1078,13 +1113,13 @@ const AdminPage: React.FC = () => {
                       Entry Fee: ₹{event.entryFee}
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <div className="flex items-center text-sm text-green-400">
                       <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
                       Active
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       <Link
                         to={`/event/${event.id}/participants`}
@@ -1104,27 +1139,21 @@ const AdminPage: React.FC = () => {
                         <button
                           onClick={() => handleExportEventParticipants(event)}
                           className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
-                          title="Export Participants Excel"
+                          title="Export Complete Data"
                         >
                           <Download className="h-4 w-4 text-blue-400" />
                         </button>
                         <button
-                          onClick={() => handleExportEventParticipantsToPDF(event)}
+                          onClick={async () => {
+                            const participants = await dataService.getParticipantsByEvent(event.id);
+                            await excelService.exportFormattedParticipantsToExcel(participants, event);
+                          }}
                           className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
-                          title="Export Participants PDF"
+                          title="Export Formatted Report"
                         >
-                          <Download className="h-4 w-4 text-red-400" />
+                          <BarChart3 className="h-4 w-4 text-green-400" />
                         </button>
                       </div>
-                      {event.isTeamEvent && (
-                        <button
-                          onClick={() => handleExportTeamDetails(event)}
-                          className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
-                          title="Export Team Details"
-                        >
-                          <Users className="h-4 w-4 text-purple-400" />
-                        </button>
-                      )}
                       <button
                         onClick={() => handleOfflineRegistration(event)}
                         className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
@@ -1154,15 +1183,71 @@ const AdminPage: React.FC = () => {
           )}
         </div>
 
-        {/* Daily Registration Closure Management */}
+        {/* Event Dates Management */}
         <div className="mt-8">
-          <h2 className="text-2xl font-semibold text-white mb-6">Daily Registration Closure</h2>
+          <h2 className="text-2xl font-semibold text-white mb-6">Event Dates Management</h2>
+          <div className="bg-gray-800 rounded-xl p-6 mb-8">
+            <p className="text-gray-300 mb-4">
+              Update dates and times for all events. Changes will apply to all events on the respective days.
+            </p>
+            <form
+              className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4"
+              onSubmit={e => { e.preventDefault(); handleUpdateEventDates(); }}
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Day 1 Date</label>
+                <input
+                  type="date"
+                  value={eventDates.day1Date}
+                  onChange={e => setEventDates({ ...eventDates, day1Date: e.target.value })}
+                  className="input-field"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Day 1 Time</label>
+                <input
+                  type="time"
+                  value={eventDates.day1Time}
+                  onChange={e => setEventDates({ ...eventDates, day1Time: e.target.value })}
+                  className="input-field"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Day 2 Date</label>
+                <input
+                  type="date"
+                  value={eventDates.day2Date}
+                  onChange={e => setEventDates({ ...eventDates, day2Date: e.target.value })}
+                  className="input-field"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Day 2 Time</label>
+                <input
+                  type="time"
+                  value={eventDates.day2Time}
+                  onChange={e => setEventDates({ ...eventDates, day2Time: e.target.value })}
+                  className="input-field"
+                  required
+                />
+              </div>
+              <div className="md:col-span-2 flex space-x-4">
+                <button type="submit" className="btn-primary flex-1">Update Dates</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {/* Event Registration Management (merged daily closure & on-the-spot pricing) */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-semibold text-white mb-6">Event Registration Management</h2>
           <div className="bg-gray-800 rounded-xl p-6">
             <p className="text-gray-300 mb-4">
-              Close registration for specific dates. Users won't be able to register on closed dates, 
-              but can still register on-the-spot during event hours if enabled.
+              Manage daily registration closure and on-the-spot pricing for each event in one place.
             </p>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {events.map((event) => (
                 <div key={event.id} className="bg-gray-700 rounded-lg p-4">
@@ -1172,11 +1257,10 @@ const AdminPage: React.FC = () => {
                       <span className="text-sm text-gray-300">Today</span>
                       <button
                         onClick={() => handleToggleDailyClosure(event, new Date().toISOString().split('T')[0])}
-                        className={`px-3 py-1 rounded text-xs font-medium ${
-                          event.dailyRegistrationClosure?.[new Date().toISOString().split('T')[0]]
-                            ? 'bg-red-600 text-white'
-                            : 'bg-green-600 text-white'
-                        }`}
+                        className={`px-3 py-1 rounded text-xs font-medium ${event.dailyRegistrationClosure?.[new Date().toISOString().split('T')[0]]
+                          ? 'bg-red-600 text-white'
+                          : 'bg-green-600 text-white'
+                          }`}
                       >
                         {event.dailyRegistrationClosure?.[new Date().toISOString().split('T')[0]]
                           ? 'Closed'
@@ -1184,16 +1268,14 @@ const AdminPage: React.FC = () => {
                         }
                       </button>
                     </div>
-                    
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-300">Event Day</span>
                       <button
                         onClick={() => handleToggleDailyClosure(event, event.date)}
-                        className={`px-3 py-1 rounded text-xs font-medium ${
-                          event.dailyRegistrationClosure?.[event.date]
-                            ? 'bg-red-600 text-white'
-                            : 'bg-green-600 text-white'
-                        }`}
+                        className={`px-3 py-1 rounded text-xs font-medium ${event.dailyRegistrationClosure?.[event.date]
+                          ? 'bg-red-600 text-white'
+                          : 'bg-green-600 text-white'
+                          }`}
                       >
                         {event.dailyRegistrationClosure?.[event.date]
                           ? 'Closed'
@@ -1201,156 +1283,10 @@ const AdminPage: React.FC = () => {
                         }
                       </button>
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Payment Reference Guide */}
-        <div className="mt-8">
-          <h2 className="text-2xl font-semibold text-white mb-6">Payment Reference Guide</h2>
-          <div className="bg-gray-800 rounded-xl p-6">
-            <p className="text-gray-300 mb-4">
-              <strong>How to match UPI transactions to participants:</strong>
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-gray-700 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-white mb-3">Method 1: UPI Transaction Search</h3>
-                <ol className="text-sm text-gray-300 space-y-2">
-                  <li>1. Go to <strong>Payment Tracking</strong> page</li>
-                  <li>2. Use <strong>"UPI Transaction Verification"</strong> section</li>
-                  <li>3. Enter amount received and transaction time</li>
-                  <li>4. System will show matching participants</li>
-                  <li>5. Confirm the correct participant</li>
-                </ol>
-              </div>
-              
-              <div className="bg-gray-700 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-white mb-3">Method 2: Manual Search</h3>
-                <ol className="text-sm text-gray-300 space-y-2">
-                  <li>1. Note the amount from UPI app</li>
-                  <li>2. Search participants by amount in Payment Tracking</li>
-                  <li>3. Check registration time vs transaction time</li>
-                  <li>4. Verify participant details match</li>
-                  <li>5. Mark as paid manually</li>
-                </ol>
-              </div>
-            </div>
-            
-            <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <p className="text-blue-400 text-sm">
-                <strong>Tip:</strong> UPI apps show transaction IDs like "TXN123456789" but our system uses payment identifiers like "GEN123456ABC123". 
-                Use amount and time matching to find the right participant.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Event Dates Management */}
-        <div className="mt-8">
-          <h2 className="text-2xl font-semibold text-white mb-6">Event Dates Management</h2>
-          <div className="bg-gray-800 rounded-xl p-6">
-            <p className="text-gray-300 mb-4">
-              Update dates and times for all events. Changes will apply to all events on the respective days.
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Day 1 Settings */}
-              <div className="bg-gray-700 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                  <Calendar className="h-5 w-5 mr-2 text-cyan-400" />
-                  Day 1 Events
-                </h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Date</label>
-                    <input
-                      type="date"
-                      value={eventDates.day1Date}
-                      onChange={(e) => setEventDates({ ...eventDates, day1Date: e.target.value })}
-                      className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Time</label>
-                    <input
-                      type="time"
-                      value={eventDates.day1Time}
-                      onChange={(e) => setEventDates({ ...eventDates, day1Time: e.target.value })}
-                      className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white"
-                    />
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    {events.filter(e => e.eventDay === 'day1').length} events on Day 1
-                  </div>
-                </div>
-              </div>
-
-              {/* Day 2 Settings */}
-              <div className="bg-gray-700 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                  <Calendar className="h-5 w-5 mr-2 text-cyan-400" />
-                  Day 2 Events
-                </h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Date</label>
-                    <input
-                      type="date"
-                      value={eventDates.day2Date}
-                      onChange={(e) => setEventDates({ ...eventDates, day2Date: e.target.value })}
-                      className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Time</label>
-                    <input
-                      type="time"
-                      value={eventDates.day2Time}
-                      onChange={(e) => setEventDates({ ...eventDates, day2Time: e.target.value })}
-                      className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white"
-                    />
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    {events.filter(e => e.eventDay === 'day2').length} events on Day 2
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={handleUpdateEventDates}
-                className="btn-primary flex items-center"
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                Update All Event Dates
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* On-the-Spot Pricing Management */}
-        <div className="mt-8">
-          <h2 className="text-2xl font-semibold text-white mb-6">On-the-Spot Pricing</h2>
-          <div className="bg-gray-800 rounded-xl p-6">
-            <p className="text-gray-300 mb-4">
-              Update on-the-spot registration pricing after regular registration closes. 
-              This allows you to adjust pricing for last-minute registrations.
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {events.map((event) => (
-                <div key={event.id} className="bg-gray-700 rounded-lg p-4">
-                  <h4 className="text-white font-medium mb-3">{event.title}</h4>
-                  <div className="space-y-3">
-                    <div>
+                    <div className="mt-4">
                       <label className="block text-sm text-gray-300 mb-1">Regular Fee</label>
                       <div className="text-lg font-semibold text-cyan-400">₹{event.entryFee}</div>
                     </div>
-                    
                     <div>
                       <label className="block text-sm text-gray-300 mb-1">On-the-Spot Fee</label>
                       <div className="flex items-center space-x-2">
@@ -1360,7 +1296,6 @@ const AdminPage: React.FC = () => {
                           onChange={(e) => handleUpdateOnSpotPricing(event, parseFloat(e.target.value) || 0)}
                           className="flex-1 px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm"
                           min="0"
-                          step="0.01"
                         />
                         <button
                           onClick={() => handleUpdateOnSpotPricing(event, event.onSpotEntryFee || event.entryFee)}
@@ -1370,7 +1305,7 @@ const AdminPage: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                    
+
                     <div className="text-xs text-gray-400">
                       {event.allowOnSpotRegistration ? (
                         <span className="text-green-400">On-the-spot enabled</span>
@@ -1403,10 +1338,10 @@ const AdminPage: React.FC = () => {
       <RegistrationControls
         isOpen={showRegistrationControls}
         onClose={() => setShowRegistrationControls(false)}
-        currentUser={{ 
-          id: adminUser?.id || '', 
-          name: adminUser?.username || 'Admin', 
-          role: 'admin' 
+        currentUser={{
+          id: adminUser?.id || '',
+          name: adminUser?.username || 'Admin',
+          role: 'admin'
         }}
       />
     </div>

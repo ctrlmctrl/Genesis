@@ -98,6 +98,7 @@ const ParticipantDashboard: React.FC = () => {
   }
 
   return (
+
     <div className="mobile-container">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -114,12 +115,7 @@ const ParticipantDashboard: React.FC = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="card-glow text-center">
-          <Calendar className="h-8 w-8 mx-auto mb-2 text-cyan-400" />
-          <h3 className="font-semibold text-white">{events.length}</h3>
-          <p className="text-sm text-gray-400">Available Events</p>
-        </div>
+      <div className="grid grid-cols-1 gap-4 mb-6">
         <div className="card-glow text-center">
           <User className="h-8 w-8 mx-auto mb-2 text-green-400" />
           <h3 className="font-semibold text-white">{participants.length}</h3>
@@ -275,68 +271,7 @@ const ParticipantDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Available Events */}
-      <div>
-        <h2 className="text-xl font-bold text-white mb-4 neon-text">Available Events</h2>
-        {(() => {
-          // Filter out events that user is already registered for
-          const registeredEventIds = participants.map(p => p.eventId);
-          const availableEvents = events.filter(event => !registeredEventIds.includes(event.id));
-          
-          if (availableEvents.length === 0) {
-            return (
-              <div className="card-glow text-center py-8">
-                <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <p className="text-gray-400">
-                  {events.length === 0 
-                    ? "No events available at the moment." 
-                    : "You're registered for all available events!"
-                  }
-                </p>
-              </div>
-            );
-          }
-          
-          return (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {availableEvents.slice(0, 4).map((event) => (
-              <motion.div
-                key={event.id}
-                className="card-glow hover:shadow-cyan-500/50 transition-shadow"
-                whileHover={{ y: -2 }}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-white">{event.title}</h3>
-                  <span className="text-sm text-gray-400">
-                    {event.isTeamEvent 
-                      ? `${Math.ceil(event.currentParticipants / (event.membersPerTeam || 1))} teams (${event.currentParticipants} members)`
-                      : `${event.currentParticipants} participants`
-                    }
-                  </span>
-                </div>
-
-                <p className="text-gray-300 mb-4 line-clamp-2">{event.description}</p>
-
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center text-sm text-blue-400">
-                    <Calendar className="h-4 w-4 mr-3" />
-                    {event.eventDay === 'day1' ? 'Day 1 Event' : 'Day 2 Event'}
-                  </div>
-                  {/* Room number hidden from event card for participants */}
-                </div>
-
-                <Link
-                  to={`/register/${event.id}`}
-                  className="btn-primary w-full text-center"
-                >
-                  Register Now
-                </Link>
-              </motion.div>
-              ))}
-            </div>
-          );
-        })()}
-      </div>
+  {/* Available Events section removed as per request */}
 
       {/* Receipt Re-upload Modal */}
       {showReceiptReupload && selectedParticipant && (
@@ -358,3 +293,4 @@ const ParticipantDashboard: React.FC = () => {
 };
 
 export default ParticipantDashboard;
+  

@@ -1,8 +1,8 @@
 import { Event, Participant, VerificationRecord } from '../types';
-import { 
-  collection, 
-  onSnapshot, 
-  query, 
+import {
+  collection,
+  onSnapshot,
+  query,
   where,
   orderBy,
   Unsubscribe
@@ -18,7 +18,7 @@ class RealtimeService {
   listenToEvents(callback: RealtimeCallback<Event>): () => void {
     const eventsRef = collection(db, 'events');
     const q = query(eventsRef, orderBy('createdAt', 'desc'));
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const events: Event[] = [];
       snapshot.forEach((doc) => {
@@ -40,7 +40,7 @@ class RealtimeService {
   listenToParticipants(callback: RealtimeCallback<Participant>): () => void {
     const participantsRef = collection(db, 'participants');
     const q = query(participantsRef, orderBy('registrationDate', 'desc'));
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const participants: Participant[] = [];
       snapshot.forEach((doc) => {
@@ -62,11 +62,11 @@ class RealtimeService {
   listenToEventParticipants(eventId: string, callback: RealtimeCallback<Participant>): () => void {
     const participantsRef = collection(db, 'participants');
     const q = query(
-      participantsRef, 
+      participantsRef,
       where('eventId', '==', eventId),
       orderBy('registrationDate', 'desc')
     );
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const participants: Participant[] = [];
       snapshot.forEach((doc) => {
@@ -88,11 +88,11 @@ class RealtimeService {
   listenToUserParticipants(userEmail: string, callback: RealtimeCallback<Participant>): () => void {
     const participantsRef = collection(db, 'participants');
     const q = query(
-      participantsRef, 
+      participantsRef,
       where('email', '==', userEmail),
       orderBy('registrationDate', 'desc')
     );
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const participants: Participant[] = [];
       snapshot.forEach((doc) => {
@@ -114,7 +114,7 @@ class RealtimeService {
   listenToVerificationRecords(callback: RealtimeCallback<VerificationRecord>): () => void {
     const verificationRef = collection(db, 'verification_records');
     const q = query(verificationRef, orderBy('verificationTime', 'desc'));
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const records: VerificationRecord[] = [];
       snapshot.forEach((doc) => {
@@ -136,11 +136,11 @@ class RealtimeService {
   listenToEventVerificationRecords(eventId: string, callback: RealtimeCallback<VerificationRecord>): () => void {
     const verificationRef = collection(db, 'verification_records');
     const q = query(
-      verificationRef, 
+      verificationRef,
       where('eventId', '==', eventId),
       orderBy('verificationTime', 'desc')
     );
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const records: VerificationRecord[] = [];
       snapshot.forEach((doc) => {
@@ -173,8 +173,3 @@ class RealtimeService {
 }
 
 export const realtimeService = new RealtimeService();
-
-
-
-
-
