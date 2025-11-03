@@ -57,7 +57,7 @@ const EventRegistration: React.FC = () => {
   useEffect(() => {
     const loadEvent = async () => {
       if (!eventId) return;
-      
+
       try {
         const eventData = await dataService.getEvent(eventId);
         if (!eventData) {
@@ -66,11 +66,11 @@ const EventRegistration: React.FC = () => {
           return;
         }
         setEvent(eventData);
-        
+
         // Check registration status
         const status = canUserRegister(eventData, user?.email);
         setRegistrationStatus(status);
-        
+
         // Determine registration type
         const regType = getRegistrationType(eventData);
         setRegistrationType(regType);
@@ -91,26 +91,26 @@ const EventRegistration: React.FC = () => {
 
   const onSubmit = async (data: RegistrationForm) => {
     if (!event || !isAuthenticated) return;
-    
+
     // If somehow user submits individual form for a team event, block and show team form
     if (event.isTeamEvent) {
       setShowTeamForm(true);
       toast.error('This is a team event. Please use team registration.');
       return;
     }
-    
+
     // Check registration status before proceeding
     const status = canUserRegister(event, user?.email);
     if (!status.canRegister) {
       toast.error(status.reason || 'Registration is not available');
       return;
     }
-    
+
     setSubmitting(true);
     try {
       // Get the appropriate entry fee for the registration type
       const entryFee = getEntryFee(event, registrationType);
-      
+
       const participant = await dataService.registerParticipant({
         eventId: event.id,
         ...data,
@@ -120,7 +120,7 @@ const EventRegistration: React.FC = () => {
       });
 
       setParticipantId(participant.id);
-      
+
       // If event has entry fee, show payment modal
       if (entryFee > 0) {
         setShowPaymentModal(true);
@@ -159,11 +159,27 @@ const EventRegistration: React.FC = () => {
     if (e) e.preventDefault();
     if (!event) return;
     if (!teamName.trim()) { toast.error('Please enter a team name'); return; }
+    const namePattern = /^[A-Z][a-zA-Z\s]*$/;
+    const phonePattern = /^[6-9]\d{9}$/;
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     // basic validation
     for (let i = 0; i < teamMembers.length; i++) {
       const m = teamMembers[i];
       if (!m.fullName || !m.phone || !m.college || !m.standard || !m.stream) {
         toast.error(`Please fill all details for team member ${i + 1}`); return;
+      }
+      if (!namePattern.test(m.fullName)) {
+        toast.error(`Member ${i + 1}: Name must start with a capital letter`);
+        return;
+      }
+
+      if (!phonePattern.test(m.phone)) {
+        toast.error(`Member ${i + 1}: Phone number must be 10 digits starting with 6, 7, 8, or 9`);
+        return;
+      }
+      if (i !== 0 && !emailPattern.test(m.email)) {
+        toast.error(`Member ${i + 1}: Please enter a valid email`);
+        return;
       }
     }
 
@@ -179,11 +195,11 @@ const EventRegistration: React.FC = () => {
       // set participantId to team lead so payment modal can use it
       setParticipantId(participants[0]?.id || '');
       setShowPaymentModal(event.entryFee > 0);
-      setTeamLoading(false);
       toast.success('Team registered — complete payment to finish registration');
     } catch (err) {
       console.error(err);
       toast.error('Team registration failed');
+    } finally {
       setTeamLoading(false);
     }
   };
@@ -197,7 +213,7 @@ const EventRegistration: React.FC = () => {
         method,
         receiptUrl
       );
-      
+
       toast.success('Payment completed! Registration successful!');
       navigate(`/qr/${participantId}`);
     } catch (error) {
@@ -285,7 +301,7 @@ const EventRegistration: React.FC = () => {
       <div className="card-glow mb-6">
         <h2 className="text-xl font-semibold text-white mb-3">{event.title}</h2>
         <p className="text-gray-300 mb-4">{event.description}</p>
-        
+
         <div className="space-y-3">
           <div className="flex items-center text-sm text-gray-400">
             <Calendar className="h-4 w-4 mr-3 text-cyan-400" />
@@ -320,8 +336,8 @@ const EventRegistration: React.FC = () => {
                 <div className="flex items-center text-green-400">
                   <div className="w-3 h-3 bg-green-400 rounded-full mr-3"></div>
                   <span>
-                    {registrationType === 'on_spot' 
-                      ? 'On-the-spot registration available' 
+                    {registrationType === 'on_spot'
+                      ? 'On-the-spot registration available'
                       : 'Registration is open'
                     }
                   </span>
@@ -332,7 +348,7 @@ const EventRegistration: React.FC = () => {
                   <span>{registrationStatus.reason}</span>
                 </div>
               )}
-              
+
               {/* Show pricing information */}
               {registrationStatus.canRegister && (
                 <div className="mt-2 text-sm text-gray-300">
@@ -354,7 +370,7 @@ const EventRegistration: React.FC = () => {
                 </div>
               )}
             </div>
-            
+
             {event.registrationStartDate && event.registrationEndDate && (
               <div className="text-right">
                 <div className="text-sm text-gray-400">
@@ -470,7 +486,7 @@ const EventRegistration: React.FC = () => {
               </label>
               <input
                 type="tel"
-                {...register('phone', { 
+                {...register('phone', {
                   required: 'Phone number is required',
                   pattern: {
                     value: /^[6-9]\d{9}$/,
@@ -542,10 +558,10 @@ const EventRegistration: React.FC = () => {
                 disabled={submitting || !registrationStatus.canRegister}
                 className={`btn-primary flex-1 ${(!registrationStatus.canRegister) ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                {submitting ? 'Registering...' : 
-                 !registrationStatus.canRegister ? 'Registration Closed' : 
-                 registrationType === 'on_spot' ? 'Register On-the-Spot' :
-                 'Register for Event'}
+                {submitting ? 'Registering...' :
+                  !registrationStatus.canRegister ? 'Registration Closed' :
+                    registrationType === 'on_spot' ? 'Register On-the-Spot' :
+                      'Register for Event'}
               </button>
             </div>
           </form>

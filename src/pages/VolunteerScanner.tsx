@@ -44,14 +44,14 @@ const VolunteerScanner: React.FC = () => {
     try {
       // Check if we're on mobile
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
+
       // Check camera availability first
       const hasCamera = await QrScanner.hasCamera();
-      
+
       if (!hasCamera) {
         throw new Error('No camera found on this device');
       }
-      
+
       // Stop any existing scanner
       if (scannerRef.current) {
         scannerRef.current.destroy();
@@ -61,7 +61,7 @@ const VolunteerScanner: React.FC = () => {
       // Set scanning state first so video element gets rendered
       setIsScanning(true);
       setShowResult(false);
-      
+
       // Wait longer for mobile devices to ensure video element is ready
       const waitTime = isMobile ? 500 : 200;
       await new Promise(resolve => setTimeout(resolve, waitTime));
@@ -108,7 +108,7 @@ const VolunteerScanner: React.FC = () => {
       // Start scanning with retry logic for mobile
       let retryCount = 0;
       const maxRetries = isMobile ? 5 : 2;
-      
+
       while (retryCount < maxRetries) {
         try {
           await scanner.start();
@@ -116,28 +116,28 @@ const VolunteerScanner: React.FC = () => {
         } catch (startError: any) {
           retryCount++;
           console.log(`Scanner start attempt ${retryCount} failed:`, startError);
-          
+
           if (retryCount >= maxRetries) {
             throw startError; // Re-throw if all retries failed
           }
-          
+
           // Wait before retry with increasing delay
           const retryDelay = isMobile ? 1000 * retryCount : 500;
           await new Promise(resolve => setTimeout(resolve, retryDelay));
         }
       }
-      
+
       // Show mobile-specific success message
       if (isMobile) {
         toast.success('Scanner started! Point your camera at a QR code.', { duration: 5000 });
       } else {
         toast.success('Scanner started successfully!');
       }
-      
+
     } catch (error: any) {
       // Reset scanning state on error
       setIsScanning(false);
-      
+
       let message = 'Scanner failed to start. ';
       if (error.name === 'NotAllowedError') {
         message += 'Camera permission denied. Please allow camera access and refresh the page.';
@@ -154,7 +154,7 @@ const VolunteerScanner: React.FC = () => {
       } else {
         message += `Error: ${error.message}`;
       }
-      
+
       toast.error(message, { duration: 10000 });
     }
   };
@@ -166,7 +166,7 @@ const VolunteerScanner: React.FC = () => {
         scannerRef.current.destroy();
         scannerRef.current = null;
       }
-      
+
       setIsScanning(false);
       setParticipant(null);
       setShowResult(false);
@@ -197,16 +197,21 @@ const VolunteerScanner: React.FC = () => {
       console.log('QR Code scanned:', decodedText);
       console.log('QR Code length:', decodedText.length);
       console.log('QR Code type:', typeof decodedText);
-      
+
       // Use the new QR code service to parse the unique code
       const foundParticipant = await dataService.getParticipantByQRCode(decodedText);
       console.log('Found participant by QR code:', foundParticipant);
-      
+
       if (!foundParticipant) {
         console.log('No participant found for QR code:', decodedText);
         toast.error('Participant not found. Please register first.');
         return;
       }
+
+      if (foundParticipant.teamId) {
+      const teamMembers = await dataService.getTeamMembers(foundParticipant.teamId);
+      (foundParticipant as any).teamMembers = teamMembers;
+    }
 
       setParticipant(foundParticipant);
       setShowResult(true);
@@ -305,33 +310,33 @@ const VolunteerScanner: React.FC = () => {
                 <Camera className="h-5 w-5 mr-2" />
                 Start Camera Scanning
               </button>
-            
-            {/* Mobile-specific retry button */}
-            {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && (
-              <div className="space-y-2">
-                <button
-                  onClick={() => window.location.reload()}
-                  className="btn-secondary w-full flex items-center justify-center text-sm py-2"
-                >
-                  Refresh Page (if scanning fails)
-                </button>
-                <button
-                  onClick={() => {
-                    // Try to request camera permission explicitly
-                    navigator.mediaDevices.getUserMedia({ video: true })
-                      .then(() => {
-                        toast.success('Camera permission granted! Try scanning again.');
-                      })
-                      .catch((error) => {
-                        toast.error('Camera permission denied. Please allow camera access in your browser settings.');
-                      });
-                  }}
-                  className="btn-secondary w-full flex items-center justify-center text-sm py-2"
-                >
-                  Request Camera Permission
-                </button>
-              </div>
-            )}
+
+              {/* Mobile-specific retry button */}
+              {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && (
+                <div className="space-y-2">
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="btn-secondary w-full flex items-center justify-center text-sm py-2"
+                  >
+                    Refresh Page (if scanning fails)
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Try to request camera permission explicitly
+                      navigator.mediaDevices.getUserMedia({ video: true })
+                        .then(() => {
+                          toast.success('Camera permission granted! Try scanning again.');
+                        })
+                        .catch((error) => {
+                          toast.error('Camera permission denied. Please allow camera access in your browser settings.');
+                        });
+                    }}
+                    className="btn-secondary w-full flex items-center justify-center text-sm py-2"
+                  >
+                    Request Camera Permission
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="mt-4 text-gray-300">
@@ -356,13 +361,13 @@ const VolunteerScanner: React.FC = () => {
                 Stop
               </button>
             </div>
-            
+
             {/* Video Preview - Moved to top */}
             <div className="relative mb-4">
-              <video 
-                id="qr-reader" 
+              <video
+                id="qr-reader"
                 className="w-full max-w-md mx-auto rounded-lg"
-                style={{ 
+                style={{
                   maxHeight: '400px',
                   objectFit: 'cover',
                   backgroundColor: '#000',
@@ -378,7 +383,7 @@ const VolunteerScanner: React.FC = () => {
                 controls={false}
               />
             </div>
-            
+
             {/* Description - Moved below video */}
             <div className="text-center">
               <p className="text-gray-400 text-sm">
@@ -395,11 +400,10 @@ const VolunteerScanner: React.FC = () => {
       {showResult && participant && (
         <div className="card-glow">
           <div className="text-center mb-6">
-            <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
-              participant.isVerified 
-                ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+            <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${participant.isVerified
+                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                 : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-            }`}>
+              }`}>
               {participant.isVerified ? (
                 <>
                   <CheckCircle className="h-4 w-4 mr-2" />
@@ -419,12 +423,12 @@ const VolunteerScanner: React.FC = () => {
               <label className="text-sm text-gray-400">Participant Name</label>
               <p className="text-lg font-semibold text-white">{participant.fullName}</p>
             </div>
-            
+
             <div>
               <label className="text-sm text-gray-400">Email</label>
               <p className="text-white">{participant.email}</p>
             </div>
-            
+
             <div>
               <label className="text-sm text-gray-400">Phone</label>
               <p className="text-white">{participant.phone}</p>
@@ -449,12 +453,45 @@ const VolunteerScanner: React.FC = () => {
               <div>
                 <label className="text-sm text-gray-400">Team</label>
                 <p className="text-white">
-                  {participant.teamName} 
+                  {participant.teamName}
                   {participant.isTeamLead && <span className="text-cyan-400 ml-2">(Team Lead)</span>}
                 </p>
               </div>
             )}
-            
+
+            {/* If scanned participant is a team lead and we have team members, show each member as an individual card */}
+            {participant.isTeamLead && (participant as any).teamMembers && Array.isArray((participant as any).teamMembers) && ((participant as any).teamMembers.filter((m: any) => m.id !== participant.id).length > 0) && (
+              <div className="mt-4">
+                <h3 className="text-lg font-semibold text-white mb-3">Team Members</h3>
+                <div className="space-y-3">
+                  {(participant as any).teamMembers.filter((m: any) => m.id !== participant.id).map((m: any) => (
+                    <div key={m.id} className="bg-gray-700 rounded-lg p-3">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h4 className="font-semibold text-white">{m.fullName} {m.isTeamLead && <span className="ml-2 text-green-400">(Team Lead)</span>}</h4>
+                          <p className="text-gray-400">{m.email} • {m.phone}</p>
+                          <div className="text-sm text-gray-300 mt-2">
+                            {m.college && <span>College: <span className="text-white ml-1">{m.college}</span></span>}
+                            {m.standard && <span className="ml-3">Std: <span className="text-white ml-1">{m.standard}</span></span>}
+                            {m.stream && <span className="ml-3">Stream: <span className="text-white ml-1">{m.stream}</span></span>}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end space-y-2">
+                          <div className="flex items-center">
+                            <span className="font-mono bg-gray-700 px-3 py-1 rounded text-white text-sm">{m.id ? m.id.slice(-8) : '—'}</span>
+                            <button onClick={() => { navigator.clipboard.writeText(m.id || ''); toast.success('Participant ID copied'); }} className="ml-2 p-1 hover:bg-gray-600 rounded transition-colors" title="Copy Participant ID"><QrCode className="h-4 w-4 text-gray-400" /></button>
+                          </div>
+                          <div>
+                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${m.isVerified ? 'text-green-400 bg-green-500/10' : 'text-yellow-400 bg-yellow-500/10'}`}>{m.isVerified ? 'Verified' : 'Pending'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="text-sm text-gray-400">Registration Date</label>
               <p className="text-white">{new Date(participant.registrationDate).toLocaleDateString()}</p>
@@ -470,7 +507,7 @@ const VolunteerScanner: React.FC = () => {
             {!participant.isVerified && (
               <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                 <p className="text-blue-400 text-sm">
-                  <strong>Note:</strong> If admin has set a room number for this event, it will be shown here. 
+                  <strong>Note:</strong> If admin has set a room number for this event, it will be shown here.
                   You can still assign a different room if needed.
                 </p>
               </div>
@@ -500,7 +537,7 @@ const VolunteerScanner: React.FC = () => {
             >
               Scan Another
             </button>
-            
+
             {!participant.isVerified && (
               <button
                 onClick={handleVerify}

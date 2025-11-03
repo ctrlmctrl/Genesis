@@ -33,13 +33,21 @@ const VolunteerDashboard: React.FC = () => {
   const loadData = async () => {
     try {
       const participantsData = await dataService.getParticipants();
-      setParticipants(participantsData);
-      
+
+      // ✅ Filter only individual participants OR team leaders
+      const filtered = participantsData.filter((p: Participant) => {
+        // Assuming team participants have `teamId`
+        // and only the leader has `isTeamLeader` or `isLeader` or `isCaptain` flag
+        return !p.teamId || p.isTeamLead === true;
+      });
+
+      setParticipants(filtered);
+
       // Calculate stats
-      const total = participantsData.length;
-      const verified = participantsData.filter((p: Participant) => p.isVerified).length;
+      const total = filtered.length;
+      const verified = filtered.filter((p: Participant) => p.isVerified).length;
       const pending = total - verified;
-      
+
       setStats({ total, verified, pending });
     } catch (error) {
       console.error('Error loading data:', error);
@@ -178,11 +186,10 @@ const VolunteerDashboard: React.FC = () => {
                       <p className="text-sm text-gray-400">{participant.email}</p>
                     </div>
                     <div className="text-right">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        participant.isVerified 
-                          ? 'bg-green-500/20 text-green-400' 
+                      <span className={`px-2 py-1 rounded-full text-xs ${participant.isVerified
+                          ? 'bg-green-500/20 text-green-400'
                           : 'bg-yellow-500/20 text-yellow-400'
-                      }`}>
+                        }`}>
                         {participant.isVerified ? 'Verified' : 'Pending'}
                       </span>
                       {participant.verificationTime && (

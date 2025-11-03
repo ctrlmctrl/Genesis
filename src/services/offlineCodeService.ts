@@ -1,3 +1,5 @@
+import { collection, addDoc, query, where, getDocs, updateDoc } from "firebase/firestore";
+import { db } from "../firebase";
 import { dataService } from './dataService';
 
 export interface OfflinePaymentCode {
@@ -43,7 +45,7 @@ export class OfflineCodeService {
   generateCode(eventId: string, amount: number, generatedBy: string): OfflinePaymentCode {
     // Generate a unique 6-character alphanumeric code
     const code = this.generateUniqueCode();
-    
+
     // Set expiration to 24 hours from now
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
@@ -68,7 +70,7 @@ export class OfflineCodeService {
   private generateUniqueCode(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
-    
+
     do {
       code = '';
       for (let i = 0; i < 6; i++) {
@@ -81,7 +83,7 @@ export class OfflineCodeService {
 
   validateCode(code: string): { isValid: boolean; codeData?: OfflinePaymentCode; error?: string } {
     const codeData = this.codes.find(c => c.code === code);
-    
+
     if (!codeData) {
       return { isValid: false, error: 'Invalid code' };
     }
@@ -92,7 +94,7 @@ export class OfflineCodeService {
 
     const now = new Date();
     const expiresAt = new Date(codeData.expiresAt);
-    
+
     if (now > expiresAt) {
       return { isValid: false, error: 'Code has expired' };
     }
@@ -103,7 +105,7 @@ export class OfflineCodeService {
   useCode(code: string, participantId: string): Promise<boolean> {
     return new Promise(async (resolve) => {
       const validation = this.validateCode(code);
-      
+
       if (!validation.isValid || !validation.codeData) {
         resolve(false);
         return;

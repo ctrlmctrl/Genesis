@@ -446,6 +446,27 @@ class DataService {
     return found;
   }
 
+async getTeamMembers(teamId: string): Promise<Participant[]> {
+  console.log('Fetching team members for team ID:', teamId);
+
+  if (this.useFirebase) {
+    try {
+      const q = query(collection(db, 'participants'), where('teamId', '==', teamId));
+      const querySnapshot = await getDocs(q);
+      console.log('Firebase team query found:', querySnapshot.docs.length, 'documents');
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Participant));
+    } catch (error) {
+      console.error('Error fetching team members from Firebase:', error);
+      return [];
+    }
+  }
+
+  // LocalStorage fallback
+  const members = this.participants.filter(p => p.teamId === teamId);
+  console.log('Found team members locally:', members.length);
+  return members;
+}
+
   async getParticipants(): Promise<Participant[]> {
     if (this.useFirebase) {
       try {
