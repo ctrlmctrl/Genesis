@@ -301,9 +301,12 @@ const PaymentTracking: React.FC = () => {
         </div>
         <div className="flex items-center space-x-2">
           <button
-            onClick={() => 
-                setShowCodeGenerator(true)
-            }
+            onClick={() => {
+              if (events.length > 0) {
+                setSelectedEventForCode(events[0]); // Default to first event
+                setShowCodeGenerator(true);
+              }
+            }}
             className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors flex items-center"
           >
             <QrCode className="h-4 w-4 mr-2" />
@@ -692,12 +695,14 @@ const PaymentTracking: React.FC = () => {
       )}
 
       {/* Offline Code Generator Modal */}
-      {showCodeGenerator && user && (
+      {showCodeGenerator && selectedEventForCode && user && (
         <OfflineCodeGenerator
           isOpen={showCodeGenerator}
           onClose={() => {
             setShowCodeGenerator(false);
+            setSelectedEventForCode(null);
           }}
+          event={selectedEventForCode}
           currentUser={{ id: user.id, name: user.name }}
         />
       )}
