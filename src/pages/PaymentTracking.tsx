@@ -300,18 +300,34 @@ const PaymentTracking: React.FC = () => {
           <h1 className="text-2xl font-bold text-white neon-text">Payment Tracking</h1>
         </div>
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => {
-              if (events.length > 0) {
-                setSelectedEventForCode(events[0]); // Default to first event
+          <div className="flex items-center space-x-2">
+            <select
+              value={selectedEventForCode?.id || ''}
+              onChange={(e) => {
+                const selected = events.find(ev => ev.id === e.target.value);
+                setSelectedEventForCode(selected || null);
+              }}
+              className="px-3 py-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:ring-2 focus:ring-cyan-500"
+            >
+              <option value="">Select Event</option>
+              {events.map(ev => (
+                <option key={ev.id} value={ev.id}>{ev.title}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => {
+                if (!selectedEventForCode) {
+                  toast.error('Please select an event first');
+                  return;
+                }
                 setShowCodeGenerator(true);
-              }
-            }}
-            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors flex items-center"
-          >
-            <QrCode className="h-4 w-4 mr-2" />
-            Generate Codes
-          </button>
+              }}
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors flex items-center"
+            >
+              <QrCode className="h-4 w-4 mr-2" />
+              Generate Codes
+            </button>
+          </div>
           <button
             onClick={handleLogout}
             className="p-2 hover:bg-gray-800 rounded-lg transition-colors"

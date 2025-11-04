@@ -19,7 +19,7 @@ export class ExcelService {
       { header: 'Contact Number', key: 'phone', width: 15, alignment: { horizontal: 'center', vertical: 'middle' } },
       { header: 'Team Name', key: 'teamName', width: 20, alignment: { horizontal: 'center', vertical: 'middle' } },
       { header: 'Payment Status', key: 'paymentStatus', width: 15, alignment: { horizontal: 'center', vertical: 'middle' } },
-      { header: 'Verification Status', key: 'verificationStatus', width: 18, alignment: { horizontal: 'center', vertical: 'middle' } },
+      { header: 'Check-in Status', key: 'verificationStatus', width: 18, alignment: { horizontal: 'center', vertical: 'middle' } },
     ];
 
     // Center align all cells after adding data

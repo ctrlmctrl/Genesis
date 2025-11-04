@@ -30,7 +30,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
     if (!isAuthenticated || !participants.length) {
       return events;
     }
-    
+
     const registeredEventIds = participants.map(p => p.eventId);
     return events.filter(event => !registeredEventIds.includes(event.id));
   };
@@ -93,7 +93,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
           >
             Beyond Excellence
           </motion.p>
-          
+
           {!isAuthenticated ? (
             <motion.div
               className="max-w-md mx-auto"
@@ -138,32 +138,32 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
           )}
         </motion.div>
 
-            {/* Quick Actions - Only show when authenticated */}
-            {isAuthenticated && (
-              <motion.div
-                className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12"
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1, duration: 0.8 }}
-              >
-                <Link
-                  to="/participant"
-                  className="card-glow hover:scale-105 transition-all duration-300 group"
+        {/* Quick Actions - Only show when authenticated */}
+        {isAuthenticated && (
+          <motion.div
+            className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12"
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1, duration: 0.8 }}
+          >
+            <Link
+              to="/participant"
+              className="card-glow hover:scale-105 transition-all duration-300 group"
+            >
+              <div className="text-center">
+                <motion.div
+                  className="mb-4"
+                  whileHover={{ rotate: 360 }}
+                  transition={{ duration: 0.5 }}
                 >
-                  <div className="text-center">
-                    <motion.div
-                      className="mb-4"
-                      whileHover={{ rotate: 360 }}
-                      transition={{ duration: 0.5 }}
-                    >
-                      <User className="h-12 w-12 mx-auto text-green-400 group-hover:text-green-300" />
-                    </motion.div>
-                    <h3 className="text-xl font-semibold text-white mb-2">My Events</h3>
-                    <p className="text-gray-400">View your registrations and QR codes</p>
-                  </div>
-                </Link>
-              </motion.div>
-            )}
+                  <User className="h-12 w-12 mx-auto text-green-400 group-hover:text-green-300" />
+                </motion.div>
+                <h3 className="text-xl font-semibold text-white mb-2">My Events</h3>
+                <p className="text-gray-400">View your registrations and QR codes</p>
+              </div>
+            </Link>
+          </motion.div>
+        )}
 
         {/* Event Location Section */}
         <motion.div
@@ -185,9 +185,9 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                 November 14-15, 2025
               </p>
               <div className="mt-4">
-                <a 
-                  href="https://maps.app.goo.gl/jEfDLpDuZxfNpzNu8" 
-                  target="_blank" 
+                <a
+                  href="https://maps.app.goo.gl/jEfDLpDuZxfNpzNu8"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-medium rounded-lg transition-colors duration-200"
                 >
@@ -221,10 +221,10 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                 {events.length === 0 ? "No Events Available" : "No Available Events"}
               </h3>
               <p className="text-gray-400">
-                {events.length === 0 
-                  ? "No events are currently available for registration" 
-                  : isAuthenticated 
-                    ? "You're registered for all available events!" 
+                {events.length === 0
+                  ? "No events are currently available for registration"
+                  : isAuthenticated
+                    ? "You're registered for all available events!"
                     : "No events are currently available for registration"
                 }
               </p>
@@ -248,78 +248,78 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                     <p className="text-gray-400 mb-6">Begin your Genesis experience with exciting workshops and competitions</p>
                     <div className="w-24 h-1 bg-gradient-to-r from-cyan-500 to-blue-500 mx-auto rounded-full"></div>
                   </div>
-                  
+
                   {day1Events.map((event, index) => (
-              <motion.div
-                key={event.id}
-                className="card-glow hover:scale-105 transition-all duration-300 group"
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
+                    <motion.div
+                      key={event.id}
+                      className="card-glow hover:scale-105 transition-all duration-300 group"
+                      initial={{ opacity: 0, y: 50 }}
+                      animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 1.6 + index * 0.1, duration: 0.5 }}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-cyan-300 transition-colors">
-                      {event.title}
-                    </h3>
-                    <p className="text-gray-300 mb-4 whitespace-pre-line">{event.description}</p>
-                  </div>
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-cyan-300 transition-colors">
+                            {event.title}
+                          </h3>
+                          <p className="text-gray-300 mb-4 whitespace-pre-line">{event.description}</p>
+                        </div>
                         <div className="flex items-center text-cyan-400 ml-4">
-                    <Calendar className="h-5 w-5 mr-1" />
+                          <Calendar className="h-5 w-5 mr-1" />
                           <span className="text-sm font-medium">Day 1</span>
-                  </div>
-                </div>
-                
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center text-gray-400">
-                    <Calendar className="h-4 w-4 mr-3 text-cyan-400" />
-                    {new Date(event.date).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </div>
-                  
-                  {/* Room number hidden until participant is verified */}
-                  
-                  {event.entryFee > 0 && (
-                    <div className="flex items-center text-cyan-400">
-                      <DollarSign className="h-4 w-4 mr-3" />
-                      Entry Fee: ₹{event.entryFee}
-                    </div>
-                  )}
-                  
-                  {event.isTeamEvent && (
-                    <div className="flex items-center text-purple-400">
-                      <Users className="h-4 w-4 mr-3" />
-                      Team Event ({event.membersPerTeam} members)
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center text-sm text-cyan-400">
-                    <div className="w-2 h-2 bg-cyan-400 rounded-full mr-2 animate-pulse"></div>
-                    Registration Open
-                  </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    {isAuthenticated ? (
-                      <Link
-                        to={`/register/${event.id}`}
-                        className="btn-primary"
-                      >
-                        Register Now
-                      </Link>
-                  ) : (
-                    <div className="text-sm text-gray-400">
-                      Sign in required
-                    </div>
-                  )}
-                  </div>
-                </div>
-              </motion.div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 mb-6">
+                        <div className="flex items-center text-gray-400">
+                          <Calendar className="h-4 w-4 mr-3 text-cyan-400" />
+                          {new Date(event.date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </div>
+
+                        {/* Room number hidden until participant is verified */}
+
+                        {event.entryFee > 0 && (
+                          <div className="flex items-center text-cyan-400">
+                            <DollarSign className="h-4 w-4 mr-3" />
+                            Entry Fee: ₹{event.entryFee}
+                          </div>
+                        )}
+
+                        {event.isTeamEvent && (
+                          <div className="flex items-center text-purple-400">
+                            <Users className="h-4 w-4 mr-3" />
+                            Team Event ({event.membersPerTeam} members)
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center text-sm text-cyan-400">
+                          <div className="w-2 h-2 bg-cyan-400 rounded-full mr-2 animate-pulse"></div>
+                          Registration Open
+                        </div>
+
+                        <div className="flex items-center space-x-3">
+                          {isAuthenticated ? (
+                            <Link
+                              to={`/register/${event.id}`}
+                              className="btn-primary"
+                            >
+                              Register Now
+                            </Link>
+                          ) : (
+                            <div className="text-sm text-gray-400">
+                              Sign in required
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
                   ))}
                 </motion.div>
               )}
@@ -341,7 +341,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                     <p className="text-gray-400 mb-6">Continue your journey with advanced challenges and grand finale competitions</p>
                     <div className="w-24 h-1 bg-gradient-to-r from-purple-500 to-pink-500 mx-auto rounded-full"></div>
                   </div>
-                  
+
                   {day2Events.map((event, index) => (
                     <motion.div
                       key={event.id}
@@ -362,7 +362,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                           <span className="text-sm font-medium">Day 2</span>
                         </div>
                       </div>
-                      
+
                       <div className="space-y-3 mb-6">
                         <div className="flex items-center text-gray-400">
                           <Calendar className="h-4 w-4 mr-3 text-purple-400" />
@@ -373,16 +373,16 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                             day: 'numeric'
                           })}
                         </div>
-                        
+
                         {/* Room number hidden until participant is verified */}
-                        
+
                         {event.entryFee > 0 && (
                           <div className="flex items-center text-purple-400">
                             <DollarSign className="h-4 w-4 mr-3" />
                             Entry Fee: ₹{event.entryFee}
                           </div>
                         )}
-                        
+
                         {event.isTeamEvent && (
                           <div className="flex items-center text-purple-400">
                             <Users className="h-4 w-4 mr-3" />
@@ -390,13 +390,13 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="flex items-center justify-between">
                         <div className="flex items-center text-sm text-purple-400">
                           <div className="w-2 h-2 bg-purple-400 rounded-full mr-2 animate-pulse"></div>
                           Registration Open
                         </div>
-                        
+
                         <div className="flex items-center space-x-3">
                           {isAuthenticated ? (
                             <Link
@@ -405,11 +405,11 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                             >
                               Register Now
                             </Link>
-                        ) : (
-                          <div className="text-sm text-gray-400">
-                            Sign in required
-                          </div>
-                        )}
+                          ) : (
+                            <div className="text-sm text-gray-400">
+                              Sign in required
+                            </div>
+                          )}
                         </div>
                       </div>
                     </motion.div>
@@ -418,6 +418,15 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
               )}
             </>
           )}
+        </motion.div>
+        <motion.div
+          className="text-center mt-10">
+          <a
+            href="tel:+917039782575"
+            className="btn-primary py-3 px-6"
+          >
+            Need help? Click here
+          </a>
         </motion.div>
       </div>
     </div>

@@ -1,9 +1,18 @@
-import { collection, addDoc, query, where, getDocs, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { dataService } from './dataService';
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  updateDoc,
+  doc,
+  Timestamp,
+} from "firebase/firestore";
+import { dataService } from "./dataService";
 
 export interface OfflinePaymentCode {
-  id: string;
+  id?: string;
   code: string;
   eventId: string;
   amount: number;
@@ -19,39 +28,36 @@ export class OfflineCodeService {
   private codes: OfflinePaymentCode[] = [];
 
   constructor() {
-    this.loadCodesFromStorage();
+    this.loadCodesFromFirebase();
   }
 
-  private loadCodesFromStorage(): void {
+  // 🔹 Load all codes from Firebase (optional cache)
+  async loadCodesFromFirebase(): Promise<void> {
     try {
-      const stored = localStorage.getItem('offline_payment_codes');
-      if (stored) {
-        this.codes = JSON.parse(stored);
-      }
+      const snapshot = await getDocs(collection(db, "offline_payment_codes"));
+      this.codes = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as OfflinePaymentCode[];
     } catch (error) {
-      console.error('Error loading offline payment codes:', error);
+      console.error("Error loading offline payment codes:", error);
       this.codes = [];
     }
   }
 
-  private saveCodesToStorage(): void {
-    try {
-      localStorage.setItem('offline_payment_codes', JSON.stringify(this.codes));
-    } catch (error) {
-      console.error('Error saving offline payment codes:', error);
-    }
-  }
-
-  generateCode(eventId: string, amount: number, generatedBy: string): OfflinePaymentCode {
-    // Generate a unique 6-character alphanumeric code
+  // 🔹 Generate new offline code (event + amount specific)
+  async generateCode(
+    eventId: string,
+    amount: number,
+    generatedBy: string
+  ): Promise<OfflinePaymentCode> {
     const code = this.generateUniqueCode();
 
-    // Set expiration to 24 hours from now
+    // Expiration → 24 hours from now
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
     const newCode: OfflinePaymentCode = {
-      id: `code_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       code,
       eventId,
       amount,
@@ -61,123 +67,168 @@ export class OfflineCodeService {
       expiresAt: expiresAt.toISOString(),
     };
 
-    this.codes.push(newCode);
-    this.saveCodesToStorage();
-
-    return newCode;
+    try {
+      const docRef = await addDoc(
+        collection(db, "offline_payment_codes"),
+        newCode
+      );
+      newCode.id = docRef.id;
+      this.codes.push(newCode);
+      return newCode;
+    } catch (error) {
+      console.error("Error generating offline payment code:", error);
+      throw error;
+    }
   }
 
+  // 🔹 Unique 6-digit alphanumeric generator
   private generateUniqueCode(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-
-    do {
-      code = '';
-      for (let i = 0; i < 6; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-    } while (this.codes.some(c => c.code === code && !c.isUsed));
-
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let code = "";
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
     return code;
   }
 
-  validateCode(code: string): { isValid: boolean; codeData?: OfflinePaymentCode; error?: string } {
-    const codeData = this.codes.find(c => c.code === code);
+  // 🔹 Validate the code (checks event, amount, expiry, and used state)
+  async validateCode(
+    code: string,
+    eventId: string,
+    eventFee: number
+  ): Promise<{ isValid: boolean; codeData?: OfflinePaymentCode; error?: string }> {
+    try {
+      const q = query(
+        collection(db, "offline_payment_codes"),
+        where("code", "==", code),
+        where("eventId", "==", eventId)
+      );
+      const snapshot = await getDocs(q);
 
-    if (!codeData) {
-      return { isValid: false, error: 'Invalid code' };
-    }
-
-    if (codeData.isUsed) {
-      return { isValid: false, error: 'Code has already been used' };
-    }
-
-    const now = new Date();
-    const expiresAt = new Date(codeData.expiresAt);
-
-    if (now > expiresAt) {
-      return { isValid: false, error: 'Code has expired' };
-    }
-
-    return { isValid: true, codeData };
-  }
-
-  useCode(code: string, participantId: string): Promise<boolean> {
-    return new Promise(async (resolve) => {
-      const validation = this.validateCode(code);
-
-      if (!validation.isValid || !validation.codeData) {
-        resolve(false);
-        return;
+      if (snapshot.empty) {
+        return { isValid: false, error: "Invalid code or event." };
       }
 
-      try {
-        // Mark the code as used
-        const codeIndex = this.codes.findIndex(c => c.code === code);
-        if (codeIndex !== -1) {
-          this.codes[codeIndex].isUsed = true;
-          this.codes[codeIndex].usedBy = participantId;
-          this.codes[codeIndex].usedAt = new Date().toISOString();
-          this.saveCodesToStorage();
-        }
+      const docSnap = snapshot.docs[0];
+      const data = docSnap.data() as OfflinePaymentCode;
+      const now = new Date();
+      const expiresAt = new Date(data.expiresAt);
 
-        // Update participant payment status
-        await dataService.updatePaymentStatus(
-          participantId,
-          'offline_paid',
-          'offline'
-        );
-
-        resolve(true);
-      } catch (error) {
-        console.error('Error using offline payment code:', error);
-        resolve(false);
+      if (data.isUsed) {
+        return { isValid: false, error: "This code has already been used." };
       }
-    });
+
+      if (now > expiresAt) {
+        return { isValid: false, error: "This code has expired." };
+      }
+
+      if (data.amount !== eventFee) {
+        return {
+          isValid: false,
+          error: `Code amount (₹${data.amount}) does not match event fee (₹${eventFee}).`,
+        };
+      }
+
+      return { isValid: true, codeData: { id: docSnap.id, ...data } };
+    } catch (error) {
+      console.error("Error validating code:", error);
+      return { isValid: false, error: "Error validating code." };
+    }
   }
 
-  getCodesByEvent(eventId: string): OfflinePaymentCode[] {
-    return this.codes.filter(c => c.eventId === eventId);
+  // 🔹 Use code (mark as used + update payment)
+  async useCode(
+    code: string,
+    eventId: string,
+    eventFee: number,
+    participantId: string
+  ): Promise<boolean> {
+    const validation = await this.validateCode(code, eventId, eventFee);
+
+    if (!validation.isValid || !validation.codeData) {
+      console.warn("Invalid or mismatched code usage:", validation.error);
+      return false;
+    }
+
+    try {
+      const docRef = doc(db, "offline_payment_codes", validation.codeData.id!);
+      await updateDoc(docRef, {
+        isUsed: true,
+        usedBy: participantId,
+        usedAt: Timestamp.now(),
+      });
+
+      await dataService.updatePaymentStatus(
+        participantId,
+        "offline_paid",
+        "offline"
+      );
+
+      console.log("Offline code marked as used and participant updated.");
+      return true;
+    } catch (error) {
+      console.error("Error using offline payment code:", error);
+      return false;
+    }
   }
 
-  getCodesByGenerator(generatedBy: string): OfflinePaymentCode[] {
-    return this.codes.filter(c => c.generatedBy === generatedBy);
+  // 🔹 Get codes by event
+  async getCodesByEvent(eventId: string): Promise<OfflinePaymentCode[]> {
+    const q = query(
+      collection(db, "offline_payment_codes"),
+      where("eventId", "==", eventId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as OfflinePaymentCode[];
   }
 
-  getUnusedCodes(): OfflinePaymentCode[] {
-    return this.codes.filter(c => !c.isUsed && new Date(c.expiresAt) > new Date());
+  // 🔹 Get unused codes
+  async getUnusedCodes(): Promise<OfflinePaymentCode[]> {
+    const q = query(
+      collection(db, "offline_payment_codes"),
+      where("isUsed", "==", false)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as OfflinePaymentCode[];
   }
 
-  getUsedCodes(): OfflinePaymentCode[] {
-    return this.codes.filter(c => c.isUsed);
+  // 🔹 Get used codes
+  async getUsedCodes(): Promise<OfflinePaymentCode[]> {
+    const q = query(
+      collection(db, "offline_payment_codes"),
+      where("isUsed", "==", true)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as OfflinePaymentCode[];
   }
-
-  getAllCodes(): OfflinePaymentCode[] {
-    return [...this.codes];
-  }
-
-  // Clean up expired codes (call this periodically)
-  cleanupExpiredCodes(): void {
-    const now = new Date();
-    this.codes = this.codes.filter(c => new Date(c.expiresAt) > now);
-    this.saveCodesToStorage();
-  }
-
   // Get statistics
-  getCodeStats(): {
+  async getCodeStats(): Promise<{
     total: number;
     used: number;
     unused: number;
     expired: number;
-  } {
+  }> {
+    const snapshot = await getDocs(collection(db, 'offlinePaymentCodes'));
+    const codes = snapshot.docs.map(doc => doc.data() as OfflinePaymentCode);
     const now = new Date();
-    const total = this.codes.length;
-    const used = this.codes.filter(c => c.isUsed).length;
-    const expired = this.codes.filter(c => !c.isUsed && new Date(c.expiresAt) <= now).length;
+
+    const total = codes.length;
+    const used = codes.filter(c => c.isUsed).length;
+    const expired = codes.filter(c => !c.isUsed && new Date(c.expiresAt) <= now).length;
     const unused = total - used - expired;
 
     return { total, used, unused, expired };
   }
+
 }
 
 export const offlineCodeService = new OfflineCodeService();

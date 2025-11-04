@@ -25,6 +25,8 @@ import { roleAuthService, RoleUser } from '../services/roleAuth';
 import { testFirebaseConnection } from '../utils/firebaseTest';
 import OfflineRegistration from '../components/OfflineRegistration';
 import RegistrationControls from '../components/RegistrationControls';
+import { collection, getDocs, query, where, doc, updateDoc } from "firebase/firestore";
+import { db } from "../firebase"; // adjust this path if your firebase config file is elsewhere
 
 const AdminPage: React.FC = () => {
   const navigate = useNavigate();
@@ -71,6 +73,7 @@ const AdminPage: React.FC = () => {
       setAdminUser(savedAdmin);
       setIsAdminAuthenticated(true);
       setupEventListeners();
+      syncEventParticipantCounts();
     } else {
       setLoading(false);
     }
@@ -111,12 +114,59 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  const syncEventParticipantCounts = async () => {
+    try {
+      const eventsSnap = await getDocs(collection(db, "events"));
+      const participantsSnap = await getDocs(collection(db, "participants"));
+
+      // Group participants by eventId
+      const eventParticipantMap: Record<string, number> = {};
+      participantsSnap.forEach((p) => {
+        const eventId = p.data().eventId;
+        if (!eventParticipantMap[eventId]) eventParticipantMap[eventId] = 0;
+        eventParticipantMap[eventId]++;
+      });
+
+      // Update each event's currentParticipants field
+      const updates = eventsSnap.docs.map(async (eventDoc) => {
+        const eventId = eventDoc.id;
+        const newCount = eventParticipantMap[eventId] || 0;
+        const eventData = eventDoc.data();
+
+        // Only update if value changed
+        if (eventData.currentParticipants !== newCount) {
+          const eventRef = doc(db, "events", eventId);
+          await updateDoc(eventRef, { currentParticipants: newCount });
+        }
+      });
+
+      await Promise.all(updates);
+      console.log("✅ Event participant counts synced successfully");
+    } catch (error) {
+      console.error("❌ Error syncing event participant counts:", error);
+    }
+  };
+
   const loadEvents = async () => {
     try {
       const [participantsData, eventsData] = await Promise.all([
         dataService.getParticipants(),
         dataService.getEvents()
       ]);
+
+      // Dynamically compute current participants for each event
+      const eventsWithCounts = await Promise.all(
+        eventsData.map(async (event) => {
+          const q = query(
+            collection(db, "participants"),
+            where("eventId", "==", event.id)
+          );
+          const snapshot = await getDocs(q);
+          const currentParticipants = snapshot.size; // count from Firestore
+          return { ...event, currentParticipants };
+        })
+      );
+
       setParticipants(participantsData);
       setEvents(eventsData);
     } catch (error) {

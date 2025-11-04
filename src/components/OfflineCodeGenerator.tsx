@@ -30,18 +30,18 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
     }
   }, [isOpen, event.id]);
 
-  const loadCodes = () => {
-    const eventCodes = offlineCodeService.getCodesByEvent(event.id);
+  const loadCodes = async () => {
+    const eventCodes = await offlineCodeService.getCodesByEvent(event.id);
     setCodes(eventCodes);
   };
 
-  const generateNewCode = () => {
+  const generateNewCode = async () => {
     if (amount <= 0) {
       toast.error('Please enter a valid amount');
       return;
     }
 
-    const newCode = offlineCodeService.generateCode(event.id, amount, currentUser.id);
+    const newCode = await offlineCodeService.generateCode(event.id, amount, currentUser.id);
     setGeneratedCode(newCode);
     loadCodes();
     toast.success('Payment code generated successfully!');
@@ -56,12 +56,12 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
     const now = new Date();
     const expires = new Date(expiresAt);
     const diff = expires.getTime() - now.getTime();
-    
+
     if (diff <= 0) return 'Expired';
-    
+
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes}m`;
     } else {
@@ -91,6 +91,23 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
     if (new Date(code.expiresAt) <= new Date()) return 'Expired';
     return 'Active';
   };
+
+  // State for code stats
+  const [stats, setStats] = useState<{ total: number; used: number; unused: number; expired: number } | null>(null);
+
+  // Fetch stats on mount
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const result = await offlineCodeService.getCodeStats();
+        setStats(result);
+      } catch (error) {
+        console.error('Error fetching code stats:', error);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   if (!isOpen) return null;
 
@@ -125,7 +142,7 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
           {/* Generate New Code */}
           <div className="bg-gray-700/50 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-white mb-4">Generate New Payment Code</h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -227,7 +244,7 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
                         {getStatusText(code)}
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       {showAllCodes && (
                         <div className="text-xs text-gray-400 text-right">
@@ -258,20 +275,17 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
           <div className="bg-gray-700/50 rounded-lg p-4">
             <h4 className="font-semibold text-white mb-3">Statistics</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {(() => {
-                const stats = offlineCodeService.getCodeStats();
-                return [
-                  { label: 'Total', value: stats.total, color: 'text-blue-400' },
-                  { label: 'Active', value: stats.unused, color: 'text-yellow-400' },
-                  { label: 'Used', value: stats.used, color: 'text-green-400' },
-                  { label: 'Expired', value: stats.expired, color: 'text-red-400' },
-                ].map((stat) => (
-                  <div key={stat.label} className="text-center">
-                    <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
-                    <div className="text-sm text-gray-400">{stat.label}</div>
-                  </div>
-                ));
-              })()}
+              {stats && [
+                { label: 'Total', value: stats.total, color: 'text-blue-400' },
+                { label: 'Active', value: stats.unused, color: 'text-yellow-400' },
+                { label: 'Used', value: stats.used, color: 'text-green-400' },
+                { label: 'Expired', value: stats.expired, color: 'text-red-400' },
+              ].map((stat) => (
+                <div key={stat.label} className="text-center">
+                  <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
+                  <div className="text-sm text-gray-400">{stat.label}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

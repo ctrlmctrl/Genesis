@@ -11,6 +11,7 @@ interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPaymentComplete: (method: 'online' | 'offline', receiptUrl?: string) => void;
+  eventId: string;
   eventTitle: string;
   amount: number;
   upiId: string;
@@ -21,6 +22,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   isOpen,
   onClose,
   onPaymentComplete,
+  eventId,
   eventTitle,
   amount,
   upiId,
@@ -40,7 +42,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       description: `Payment for ${eventTitle}`,
     };
 
-    
+
     try {
       const qrCode = await paymentService.generateUPIQRCode(paymentDetails);
       setQrCodeDataURL(qrCode);
@@ -86,8 +88,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
     setIsValidatingCode(true);
     try {
-      const success = await offlineCodeService.useCode(offlineCode.trim().toUpperCase(), participantId);
-      
+      const success = await offlineCodeService.useCode(offlineCode.trim().toUpperCase(), eventId, amount, participantId);
+
       if (success) {
         toast.success('Payment code validated successfully!');
         onPaymentComplete('offline');
@@ -110,19 +112,19 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     }
 
     setIsProcessing(true);
-    
+
     try {
       let receiptUrl: string | undefined;
-      
+
       // Upload receipt for online payments only
       if (receiptFile && participantId) {
         receiptUrl = await fileUploadService.uploadReceipt(receiptFile, participantId);
         toast.success('Receipt uploaded successfully!');
       }
-      
+
       // Simulate payment processing
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       onPaymentComplete(selectedMethod, receiptUrl);
       toast.success('Payment completed successfully!');
       onClose();
@@ -180,22 +182,20 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setSelectedMethod('online')}
-                  className={`p-3 rounded-lg border transition-all ${
-                    selectedMethod === 'online'
+                  className={`p-3 rounded-lg border transition-all ${selectedMethod === 'online'
                       ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
                       : 'border-gray-600 text-gray-400 hover:border-gray-500'
-                  }`}
+                    }`}
                 >
                   <QrCode className="h-6 w-6 mx-auto mb-2" />
                   <span className="text-sm font-medium">Online UPI</span>
                 </button>
                 <button
                   onClick={() => setSelectedMethod('offline')}
-                  className={`p-3 rounded-lg border transition-all ${
-                    selectedMethod === 'offline'
+                  className={`p-3 rounded-lg border transition-all ${selectedMethod === 'offline'
                       ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
                       : 'border-gray-600 text-gray-400 hover:border-gray-500'
-                  }`}
+                    }`}
                 >
                   <Upload className="h-6 w-6 mx-auto mb-2" />
                   <span className="text-sm font-medium">Offline</span>
@@ -240,7 +240,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                   <p className="text-sm text-blue-300 mb-3">
                     Please upload a screenshot or photo of your payment receipt to complete the registration.
                   </p>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Upload Payment Receipt *
@@ -309,7 +309,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                   selectedMethod === 'offline' ? 'Validate Payment Code' : 'Complete Payment'
                 )}
               </button>
-              
+
               <button
                 onClick={onClose}
                 className="w-full btn-secondary"

@@ -574,6 +574,7 @@ const EventRegistration: React.FC = () => {
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
           onPaymentComplete={handlePaymentComplete}
+          eventId={event.id}
           eventTitle={event.title}
           amount={getEntryFee(event, registrationType)}
           upiId={event.upiId || 'genesis@upi'}
