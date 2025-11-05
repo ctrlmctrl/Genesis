@@ -6,6 +6,8 @@ import { paymentService } from '../services/paymentService';
 import { fileUploadService } from '../services/fileUploadService';
 import { offlineCodeService } from '../services/offlineCodeService';
 import toast from 'react-hot-toast';
+import { updateDoc, doc} from 'firebase/firestore';
+import {db} from '../firebase';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -121,6 +123,18 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         receiptUrl = await fileUploadService.uploadReceipt(receiptFile, participantId);
         toast.success('Receipt uploaded successfully!');
       }
+      
+      // ✅ Update participant payment status to 'underVerification'
+      if (participantId && receiptUrl) {
+        const participantRef = doc(db, 'participants', participantId);
+        await updateDoc(participantRef, {
+          paymentStatus: 'underVerification',
+          paymentReceipt: receiptUrl,
+          paymentMethod: selectedMethod,
+          paymentTimestamp: new Date().toISOString(),
+        });
+        toast.success('Payment is under verification!');
+      }
 
       // Simulate payment processing
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -183,8 +197,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                 <button
                   onClick={() => setSelectedMethod('online')}
                   className={`p-3 rounded-lg border transition-all ${selectedMethod === 'online'
-                      ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
-                      : 'border-gray-600 text-gray-400 hover:border-gray-500'
+                    ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
+                    : 'border-gray-600 text-gray-400 hover:border-gray-500'
                     }`}
                 >
                   <QrCode className="h-6 w-6 mx-auto mb-2" />
@@ -193,8 +207,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                 <button
                   onClick={() => setSelectedMethod('offline')}
                   className={`p-3 rounded-lg border transition-all ${selectedMethod === 'offline'
-                      ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
-                      : 'border-gray-600 text-gray-400 hover:border-gray-500'
+                    ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
+                    : 'border-gray-600 text-gray-400 hover:border-gray-500'
                     }`}
                 >
                   <Upload className="h-6 w-6 mx-auto mb-2" />

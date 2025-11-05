@@ -13,21 +13,22 @@ export interface Event {
   isTeamEvent: boolean;
   eventDay: 'day1' | 'day2'; // Event categorization
   membersPerTeam?: number; // Number of members allowed per team
-  
+
   // On-the-spot registration fields
   allowOnSpotRegistration?: boolean; // Allow on-the-spot registration when event is being held
   onSpotEntryFee?: number; // Different fee for on-the-spot registration
   onSpotPaymentMethod?: 'online' | 'offline' | 'both'; // Payment method for on-the-spot
   onSpotStartTime?: string; // HH:MM format - when on-the-spot registration starts
   onSpotEndTime?: string; // HH:MM format - when on-the-spot registration ends
-  
+
   // Registration deadline fields (for regular registration)
   registrationStartDate?: string; // YYYY-MM-DD format
   registrationStartTime?: string; // HH:MM format
   registrationEndDate?: string;   // YYYY-MM-DD format
   registrationEndTime?: string;   // HH:MM format
+  allowRegistration: boolean;
   allowLateRegistration?: boolean; // Admin/volunteer override
-  
+
   // Advanced registration controls
   registrationControls?: {
     allowAfterDeadline: boolean; // Allow registration after deadline
@@ -37,12 +38,12 @@ export interface Event {
     setBy?: string; // Admin/volunteer who set the override
     setAt?: string; // When the override was set
   };
-  
+
   // Daily registration closure
   dailyRegistrationClosure?: {
     [date: string]: boolean; // YYYY-MM-DD format -> true if registration closed for that day
   };
-  
+
   // Day-wise registration controls
   dayWiseControls?: {
     day1?: {
@@ -58,7 +59,7 @@ export interface Event {
       allowLateRegistration?: boolean;
     };
   };
-  
+
   createdAt: string;
   updatedAt: string;
 }

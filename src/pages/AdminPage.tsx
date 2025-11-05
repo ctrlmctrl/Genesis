@@ -190,6 +190,7 @@ const AdminPage: React.FC = () => {
         date: eventDate,
         time: eventTime,
         isActive: true,
+        allowRegistration: true,
       });
 
       toast.success('Event created successfully!');

@@ -41,6 +41,29 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
   const day1Events = availableEvents.filter(event => event.eventDay === 'day1');
   const day2Events = availableEvents.filter(event => event.eventDay === 'day2');
 
+  const isRegistrationOpen = (event: Event): boolean => {
+    const now = new Date();
+
+    if (!event.allowRegistration) {
+      return false; // Registration not allowed
+    }
+
+    // --- Registration Start Check ---
+    if (event.registrationStartDate && event.registrationStartTime) {
+      const start = new Date(`${event.registrationStartDate}T${event.registrationStartTime}`);
+      if (now < start) return false; // Not yet started
+    }
+
+    // --- Registration End Check ---
+    if (event.registrationEndDate && event.registrationEndTime) {
+      const end = new Date(`${event.registrationEndDate}T${event.registrationEndTime}`);
+      if (now > end) return false; // Already ended
+    }
+
+    // Default: registration open
+    return true;
+  };
+
   return (
     <div className="min-h-screen tech-bg">
       {/* Animated Background Elements */}
@@ -297,27 +320,30 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                           </div>
                         )}
                       </div>
-
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center text-sm text-cyan-400">
-                          <div className="w-2 h-2 bg-cyan-400 rounded-full mr-2 animate-pulse"></div>
-                          Registration Open
-                        </div>
-
-                        <div className="flex items-center space-x-3">
-                          {isAuthenticated ? (
-                            <Link
-                              to={`/register/${event.id}`}
-                              className="btn-primary"
-                            >
-                              Register Now
-                            </Link>
-                          ) : (
-                            <div className="text-sm text-gray-400">
-                              Sign in required
+                        {isRegistrationOpen(event) ? (
+                          <>
+                            <div className="flex items-center text-sm text-cyan-400">
+                              <div className="w-2 h-2 bg-cyan-400 rounded-full mr-2 animate-pulse"></div>
+                              Registration Open
                             </div>
-                          )}
-                        </div>
+
+                            <div className="flex items-center space-x-3">
+                              {isAuthenticated ? (
+                                <Link to={`/register/${event.id}`} className="btn-primary">
+                                  Register Now
+                                </Link>
+                              ) : (
+                                <div className="text-sm text-gray-400">Sign in required</div>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center text-sm text-red-400">
+                            <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+                            Registration Closed
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   ))}
@@ -392,25 +418,29 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center text-sm text-purple-400">
-                          <div className="w-2 h-2 bg-purple-400 rounded-full mr-2 animate-pulse"></div>
-                          Registration Open
-                        </div>
-
-                        <div className="flex items-center space-x-3">
-                          {isAuthenticated ? (
-                            <Link
-                              to={`/register/${event.id}`}
-                              className="btn-primary"
-                            >
-                              Register Now
-                            </Link>
-                          ) : (
-                            <div className="text-sm text-gray-400">
-                              Sign in required
+                        {isRegistrationOpen(event) ? (
+                          <>
+                            <div className="flex items-center text-sm text-cyan-400">
+                              <div className="w-2 h-2 bg-cyan-400 rounded-full mr-2 animate-pulse"></div>
+                              Registration Open
                             </div>
-                          )}
-                        </div>
+
+                            <div className="flex items-center space-x-3">
+                              {isAuthenticated ? (
+                                <Link to={`/register/${event.id}`} className="btn-primary">
+                                  Register Now
+                                </Link>
+                              ) : (
+                                <div className="text-sm text-gray-400">Sign in required</div>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center text-sm text-red-400">
+                            <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+                            Registration Closed
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   ))}

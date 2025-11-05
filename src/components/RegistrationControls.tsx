@@ -22,7 +22,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(event || null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  
+
   // Global controls (for all events)
   const [globalControls, setGlobalControls] = useState({
     allowAfterDeadline: false,
@@ -30,23 +30,30 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
     allowAfterDeadlineForVolunteers: true,
     deadlineOverrideReason: '',
   });
-  
+
   // Day-wise controls
   const [dayWiseControls, setDayWiseControls] = useState({
-    day1: {
-      allowRegistration: true,
-      registrationEndDate: '',
-      registrationEndTime: '',
-      allowLateRegistration: false,
-    },
-    day2: {
-      allowRegistration: true,
-      registrationEndDate: '',
-      registrationEndTime: '',
-      allowLateRegistration: false,
-    },
+    allowRegistration: true,
+    registrationEndDate: '',
+    registrationEndTime: '',
+    allowLateRegistration: false,
   });
-  
+
+  const [day1Controls, setDay1Controls] = useState({
+    allowRegistration: true,
+    registrationEndDate: '',
+    registrationEndTime: '',
+    allowLateRegistration: false,
+  });
+
+  const [day2Controls, setDay2Controls] = useState({
+    allowRegistration: true,
+    registrationEndDate: '',
+    registrationEndTime: '',
+    allowLateRegistration: false,
+  });
+
+
   // Event-specific controls
   const [eventControls, setEventControls] = useState({
     allowAfterDeadline: false,
@@ -81,6 +88,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
   };
 
   const loadEventControls = (eventData: Event) => {
+    // Load registration control fields
     if (eventData.registrationControls) {
       setEventControls({
         allowAfterDeadline: eventData.registrationControls.allowAfterDeadline,
@@ -91,24 +99,25 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
         registrationEndTime: eventData.registrationEndTime || '',
       });
     }
-    
-    if (eventData.dayWiseControls) {
-      setDayWiseControls({
-        day1: {
-          allowRegistration: eventData.dayWiseControls.day1?.allowRegistration ?? true,
-          registrationEndDate: eventData.dayWiseControls.day1?.registrationEndDate || '',
-          registrationEndTime: eventData.dayWiseControls.day1?.registrationEndTime || '',
-          allowLateRegistration: eventData.dayWiseControls.day1?.allowLateRegistration ?? false,
-        },
-        day2: {
-          allowRegistration: eventData.dayWiseControls.day2?.allowRegistration ?? true,
-          registrationEndDate: eventData.dayWiseControls.day2?.registrationEndDate || '',
-          registrationEndTime: eventData.dayWiseControls.day2?.registrationEndTime || '',
-          allowLateRegistration: eventData.dayWiseControls.day2?.allowLateRegistration ?? false,
-        },
+
+    // Load flat fields for UI control, but only for the correct event day
+    if (eventData.eventDay === 'day1') {
+      setDay1Controls({
+        allowRegistration: eventData.allowRegistration ?? false,
+        registrationEndDate: eventData.registrationEndDate || '',
+        registrationEndTime: eventData.registrationEndTime || '',
+        allowLateRegistration: eventData.allowLateRegistration ?? false,
+      });
+    } else if (eventData.eventDay === 'day2') {
+      setDay2Controls({
+        allowRegistration: eventData.allowRegistration ?? false,
+        registrationEndDate: eventData.registrationEndDate || '',
+        registrationEndTime: eventData.registrationEndTime || '',
+        allowLateRegistration: eventData.allowLateRegistration ?? false,
       });
     }
   };
+
 
   const handleSaveGlobalControls = async () => {
     setSaving(true);
@@ -128,7 +137,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
         };
         await dataService.updateEvent(eventData.id, updatedEvent);
       }
-      
+
       toast.success('Global registration controls updated successfully!');
     } catch (error) {
       console.error('Error saving global controls:', error);
@@ -140,34 +149,30 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
 
   const handleSaveEventControls = async () => {
     if (!selectedEvent) return;
-    
+
     setSaving(true);
     try {
-      const updatedEvent = {
-        ...selectedEvent,
-        registrationControls: {
-          allowAfterDeadline: eventControls.allowAfterDeadline,
-          allowAfterDeadlineForAdmins: eventControls.allowAfterDeadlineForAdmins,
-          allowAfterDeadlineForVolunteers: eventControls.allowAfterDeadlineForVolunteers,
-          deadlineOverrideReason: eventControls.deadlineOverrideReason,
-          setBy: currentUser.name,
-          setAt: new Date().toISOString(),
-        },
-        registrationEndDate: eventControls.registrationEndDate,
-        registrationEndTime: eventControls.registrationEndTime,
-        dayWiseControls: {
-          day1: dayWiseControls.day1,
-          day2: dayWiseControls.day2,
-        },
-      };
-      
-      await dataService.updateEvent(selectedEvent.id, updatedEvent);
-      setSelectedEvent(updatedEvent);
-      
-      toast.success('Event registration controls updated successfully!');
+      // Build dayWiseControls only for the event's day
+      const updatedDayWiseControls: any = {};
+      for (const eventData of events) {
+        const isDay1 = eventData.eventDay === "day1";
+        const isDay2 = eventData.eventDay === "day2";
+
+        const updatedEvent = {
+          ...eventData,
+          allowRegistration: isDay1 ? day1Controls.allowRegistration : day2Controls.allowRegistration,
+          registrationEndDate: isDay1 ? day1Controls.registrationEndDate : day2Controls.registrationEndDate,
+          registrationEndTime: isDay1 ? day1Controls.registrationEndTime : day2Controls.registrationEndTime,
+          allowLateRegistration: isDay1 ? day1Controls.allowLateRegistration : day2Controls.allowLateRegistration,
+        };
+
+        await dataService.updateEvent(eventData.id, updatedEvent);
+        setSelectedEvent(updatedEvent);
+      }
+      toast.success("Event registration controls updated successfully!");
     } catch (error) {
-      console.error('Error saving event controls:', error);
-      toast.error('Failed to save event controls');
+      console.error("Error saving event controls:", error);
+      toast.error("Failed to save event controls");
     } finally {
       setSaving(false);
     }
@@ -176,18 +181,27 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
   const handleSaveDayWiseControls = async () => {
     setSaving(true);
     try {
-      // Apply day-wise controls to all events
+      // Apply controls based on event day — save as flat fields
       for (const eventData of events) {
-        const updatedEvent = {
-          ...eventData,
-          dayWiseControls: {
-            day1: dayWiseControls.day1,
-            day2: dayWiseControls.day2,
-          },
-        };
+        let updatedEvent = { ...eventData };
+
+        if (eventData.eventDay === 'day1') {
+          updatedEvent.allowRegistration = day1Controls.allowRegistration;
+          updatedEvent.registrationEndDate = day1Controls.registrationEndDate;
+          updatedEvent.registrationEndTime = day1Controls.registrationEndTime;
+          updatedEvent.allowLateRegistration = day1Controls.allowLateRegistration;
+        } else if (eventData.eventDay === 'day2') {
+          updatedEvent.allowRegistration = day2Controls.allowRegistration;
+          updatedEvent.registrationEndDate = day2Controls.registrationEndDate;
+          updatedEvent.registrationEndTime = day2Controls.registrationEndTime;
+          updatedEvent.allowLateRegistration = day2Controls.allowLateRegistration;
+        } else {
+          continue; // Skip unknown eventDay
+        }
+
         await dataService.updateEvent(eventData.id, updatedEvent);
       }
-      
+
       toast.success('Day-wise registration controls updated successfully!');
     } catch (error) {
       console.error('Error saving day-wise controls:', error);
@@ -245,7 +259,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                   <p className="text-sm text-gray-400 mb-6">
                     These settings will apply to all events. Use this for system-wide registration policies.
                   </p>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div className="flex items-center space-x-3">
@@ -263,7 +277,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                           Allow registration after deadline
                         </label>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3">
                         <input
                           type="checkbox"
@@ -279,7 +293,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                           Allow admins to register after deadline
                         </label>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3">
                         <input
                           type="checkbox"
@@ -296,7 +310,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                         </label>
                       </div>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Override Reason
@@ -313,7 +327,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                       />
                     </div>
                   </div>
-                  
+
                   <div className="mt-6">
                     <button
                       onClick={handleSaveGlobalControls}
@@ -336,7 +350,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                 <p className="text-sm text-gray-400 mb-6">
                   Control registration availability for Day 1 and Day 2 events separately.
                 </p>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Day 1 Controls */}
                   <div className="space-y-4">
@@ -344,15 +358,15 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                       <Calendar className="h-4 w-4 mr-2" />
                       Day 1 Events
                     </h4>
-                    
+
                     <div className="flex items-center space-x-3">
                       <input
                         type="checkbox"
                         id="day1-allow"
-                        checked={dayWiseControls.day1.allowRegistration}
-                        onChange={(e) => setDayWiseControls(prev => ({
+                        checked={day1Controls.allowRegistration}
+                        onChange={(e) => setDay1Controls(prev => ({
                           ...prev,
-                          day1: { ...prev.day1, allowRegistration: e.target.checked }
+                          allowRegistration: e.target.checked
                         }))}
                         className="w-4 h-4 text-cyan-600 bg-gray-700 border-gray-600 rounded focus:ring-cyan-500"
                       />
@@ -360,45 +374,45 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                         Allow Day 1 registration
                       </label>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Registration End Date
                       </label>
                       <input
                         type="date"
-                        value={dayWiseControls.day1.registrationEndDate}
-                        onChange={(e) => setDayWiseControls(prev => ({
+                        value={day1Controls.registrationEndDate}
+                        onChange={(e) => setDay1Controls(prev => ({
                           ...prev,
-                          day1: { ...prev.day1, registrationEndDate: e.target.value }
+                          registrationEndDate: e.target.value
                         }))}
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Registration End Time
                       </label>
                       <input
                         type="time"
-                        value={dayWiseControls.day1.registrationEndTime}
-                        onChange={(e) => setDayWiseControls(prev => ({
+                        value={day1Controls.registrationEndTime}
+                        onChange={(e) => setDay1Controls(prev => ({
                           ...prev,
-                          day1: { ...prev.day1, registrationEndTime: e.target.value }
+                          registrationEndTime: e.target.value
                         }))}
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                       />
                     </div>
-                    
+
                     <div className="flex items-center space-x-3">
                       <input
                         type="checkbox"
                         id="day1-late"
-                        checked={dayWiseControls.day1.allowLateRegistration}
-                        onChange={(e) => setDayWiseControls(prev => ({
+                        checked={day1Controls.allowLateRegistration}
+                        onChange={(e) => setDay1Controls(prev => ({
                           ...prev,
-                          day1: { ...prev.day1, allowLateRegistration: e.target.checked }
+                          allowLateRegistration: e.target.checked
                         }))}
                         className="w-4 h-4 text-cyan-600 bg-gray-700 border-gray-600 rounded focus:ring-cyan-500"
                       />
@@ -407,22 +421,22 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                       </label>
                     </div>
                   </div>
-                  
+
                   {/* Day 2 Controls */}
                   <div className="space-y-4">
                     <h4 className="font-semibold text-purple-400 flex items-center">
                       <Calendar className="h-4 w-4 mr-2" />
                       Day 2 Events
                     </h4>
-                    
+
                     <div className="flex items-center space-x-3">
                       <input
                         type="checkbox"
                         id="day2-allow"
-                        checked={dayWiseControls.day2.allowRegistration}
-                        onChange={(e) => setDayWiseControls(prev => ({
+                        checked={day2Controls.allowRegistration}
+                        onChange={(e) => setDay2Controls(prev => ({
                           ...prev,
-                          day2: { ...prev.day2, allowRegistration: e.target.checked }
+                          allowRegistration: e.target.checked
                         }))}
                         className="w-4 h-4 text-cyan-600 bg-gray-700 border-gray-600 rounded focus:ring-cyan-500"
                       />
@@ -430,45 +444,45 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                         Allow Day 2 registration
                       </label>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Registration End Date
                       </label>
                       <input
                         type="date"
-                        value={dayWiseControls.day2.registrationEndDate}
-                        onChange={(e) => setDayWiseControls(prev => ({
+                        value={day2Controls.registrationEndDate}
+                        onChange={(e) => setDay2Controls(prev => ({
                           ...prev,
-                          day2: { ...prev.day2, registrationEndDate: e.target.value }
+                          registrationEndDate: e.target.value
                         }))}
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Registration End Time
                       </label>
                       <input
                         type="time"
-                        value={dayWiseControls.day2.registrationEndTime}
-                        onChange={(e) => setDayWiseControls(prev => ({
+                        value={day2Controls.registrationEndTime}
+                        onChange={(e) => setDay2Controls(prev => ({
                           ...prev,
-                          day2: { ...prev.day2, registrationEndTime: e.target.value }
+                          registrationEndTime: e.target.value
                         }))}
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                       />
                     </div>
-                    
+
                     <div className="flex items-center space-x-3">
                       <input
                         type="checkbox"
                         id="day2-late"
-                        checked={dayWiseControls.day2.allowLateRegistration}
-                        onChange={(e) => setDayWiseControls(prev => ({
+                        checked={day2Controls.allowLateRegistration}
+                        onChange={(e) => setDay2Controls(prev => ({
                           ...prev,
-                          day2: { ...prev.day2, allowLateRegistration: e.target.checked }
+                          allowLateRegistration: e.target.checked
                         }))}
                         className="w-4 h-4 text-cyan-600 bg-gray-700 border-gray-600 rounded focus:ring-cyan-500"
                       />
@@ -478,7 +492,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="mt-6">
                   <button
                     onClick={handleSaveDayWiseControls}
@@ -498,7 +512,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                     <Users className="h-5 w-5 text-green-400 mr-2" />
                     <h3 className="text-lg font-semibold text-white">Event-specific Controls</h3>
                   </div>
-                  
+
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Select Event
@@ -520,14 +534,14 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                       ))}
                     </select>
                   </div>
-                  
+
                   {selectedEvent && (
                     <div className="space-y-4">
                       <div className="bg-gray-600/50 rounded-lg p-4">
                         <h4 className="font-semibold text-white mb-2">{selectedEvent.title}</h4>
                         <p className="text-sm text-gray-400">Day: {selectedEvent.eventDay}</p>
                       </div>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -543,7 +557,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                             className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                           />
                         </div>
-                        
+
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-2">
                             Registration End Time
@@ -559,7 +573,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                           />
                         </div>
                       </div>
-                      
+
                       <div className="space-y-3">
                         <div className="flex items-center space-x-3">
                           <input
@@ -576,7 +590,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                             Allow registration after deadline
                           </label>
                         </div>
-                        
+
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-2">
                             Override Reason
@@ -593,7 +607,7 @@ const RegistrationControls: React.FC<RegistrationControlsProps> = ({
                           />
                         </div>
                       </div>
-                      
+
                       <button
                         onClick={handleSaveEventControls}
                         disabled={saving}

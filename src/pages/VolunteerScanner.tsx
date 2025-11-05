@@ -209,13 +209,25 @@ const VolunteerScanner: React.FC = () => {
       }
 
       if (foundParticipant.teamId) {
-      const teamMembers = await dataService.getTeamMembers(foundParticipant.teamId);
-      (foundParticipant as any).teamMembers = teamMembers;
-    }
+        const teamMembers = await dataService.getTeamMembers(foundParticipant.teamId);
+        (foundParticipant as any).teamMembers = teamMembers;
+      }
 
+      // Stop scanner when a QR code is successfully scanned
+      if (scannerRef.current) {
+        try {
+          await scannerRef.current.stop(); // stop scanning
+          scannerRef.current.destroy();    // release the camera
+          scannerRef.current = null;
+        } catch (stopError) {
+          console.warn('Error stopping scanner:', stopError);
+        }
+      }
+
+      setIsScanning(false);
       setParticipant(foundParticipant);
       setShowResult(true);
-      setIsScanning(false);
+
     } catch (error) {
       console.error('Error processing QR code:', error);
       toast.error('Failed to process QR code');
@@ -401,8 +413,8 @@ const VolunteerScanner: React.FC = () => {
         <div className="card-glow">
           <div className="text-center mb-6">
             <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${participant.isVerified
-                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+              : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
               }`}>
               {participant.isVerified ? (
                 <>

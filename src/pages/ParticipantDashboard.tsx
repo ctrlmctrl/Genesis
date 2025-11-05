@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import ReceiptUpload from '../components/ReceiptUpload';
 import ReceiptReupload from '../components/ReceiptReupload';
 import toast from 'react-hot-toast';
+import PaymentModal from '../components/PaymentModal';
 
 const ParticipantDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -41,8 +42,8 @@ const ParticipantDashboard: React.FC = () => {
     };
 
     // Check if we're using Firebase (production) or localStorage (development)
-    const isFirebase = process.env.REACT_APP_STORAGE_MODE === 'firebase' || 
-                      (process.env.NODE_ENV === 'production' && !process.env.REACT_APP_STORAGE_MODE);
+    const isFirebase = process.env.REACT_APP_STORAGE_MODE === 'firebase' ||
+      (process.env.NODE_ENV === 'production' && !process.env.REACT_APP_STORAGE_MODE);
 
     if (isFirebase) {
       setupRealtimeListeners();
@@ -69,7 +70,7 @@ const ParticipantDashboard: React.FC = () => {
         dataService.getEvents(),
         user?.email ? dataService.getParticipantsByEmail(user.email) : Promise.resolve([])
       ]);
-      
+
       setEvents(eventsData);
       setParticipants(userParticipants);
     } catch (error) {
@@ -83,6 +84,22 @@ const ParticipantDashboard: React.FC = () => {
     await loadData();
     toast.success('Receipt uploaded successfully! Payment will be verified soon.');
   };
+
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [selectedParticipantForPayment, setSelectedParticipantForPayment] = useState<Participant | null>(null);
+
+  const handlePaymentComplete = async (method: 'online' | 'offline', receiptUrl?: string) => {
+    try {
+      // Reload participant data to reflect payment status changes
+      await loadData();
+      toast.success(`Payment completed successfully via ${method}!`);
+    } catch (error) {
+      console.error('Error refreshing after payment:', error);
+      toast.error('Could not refresh data after payment');
+    }
+  };
+
 
   if (loading) {
     return (
@@ -163,17 +180,16 @@ const ParticipantDashboard: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      participant.paymentStatus === 'paid' ? 'bg-green-500/20 text-green-400' :
+                    <span className={`px-2 py-1 rounded-full text-xs ${participant.paymentStatus === 'paid' ? 'bg-green-500/20 text-green-400' :
                       participant.paymentStatus === 'offline_paid' ? 'bg-blue-500/20 text-blue-400' :
-                      participant.paymentStatus === 'under_verification' ? 'bg-purple-500/20 text-purple-400' :
-                      participant.paymentStatus === 'failed' ? 'bg-red-500/20 text-red-400' :
-                      'bg-yellow-500/20 text-yellow-400'
-                    }`}>
+                        participant.paymentStatus === 'under_verification' ? 'bg-purple-500/20 text-purple-400' :
+                          participant.paymentStatus === 'failed' ? 'bg-red-500/20 text-red-400' :
+                            'bg-yellow-500/20 text-yellow-400'
+                      }`}>
                       {participant.paymentStatus === 'paid' ? 'Paid' :
-                       participant.paymentStatus === 'offline_paid' ? 'Offline Paid' :
-                       participant.paymentStatus === 'under_verification' ? 'Under Review' :
-                       participant.paymentStatus === 'failed' ? 'Failed' : 'Pending'}
+                        participant.paymentStatus === 'offline_paid' ? 'Offline Paid' :
+                          participant.paymentStatus === 'under_verification' ? 'Under Review' :
+                            participant.paymentStatus === 'failed' ? 'Failed' : 'Pending'}
                     </span>
                   </div>
 
@@ -209,15 +225,22 @@ const ParticipantDashboard: React.FC = () => {
                   </div>
 
                   {/* Receipt Upload Section */}
-                  {participant.paymentStatus === 'pending' && (
-                    <div className="mb-4">
-                      <ReceiptUpload
-                        participantId={participant.id}
-                        currentReceiptUrl={participant.receiptUrl}
-                        onUploadSuccess={(receiptUrl) => handleReceiptUploadSuccess(participant.id, receiptUrl)}
-                      />
+                  {(participant.paymentStatus === 'pending' || participant.paymentStatus === 'failed') && (
+                    <div className="mb-4 text-center">
+                      <button
+                        onClick={() => {
+                          setSelectedEvent(event || null);
+                          setSelectedParticipantForPayment(participant);
+                          setShowPaymentModal(true);
+                        }}
+                        className="btn-primary w-full text-center flex items-center justify-center space-x-2"
+                      >
+                        <QrCode className="h-4 w-4" />
+                        <span>{participant.paymentStatus === 'failed' ? 'Retry Payment' : 'Pay Now'}</span>
+                      </button>
                     </div>
                   )}
+
 
                   {/* Failed Payment Re-upload Section */}
                   {participant.paymentStatus === 'under_verification' && (
@@ -233,37 +256,19 @@ const ParticipantDashboard: React.FC = () => {
                       </div>
                     </div>
                   )}
-
-                  {participant.paymentStatus === 'failed' && (
-                    <div className="mb-4">
-                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-4">
-                        <div className="flex items-center mb-2">
-                          <div className="h-2 w-2 bg-red-400 rounded-full mr-2"></div>
-                          <span className="text-red-400 font-medium">Payment Verification Failed</span>
-                        </div>
-                        <p className="text-sm text-red-300 mb-3">
-                          Your payment receipt could not be verified. Please upload a clear, high-quality image of your payment receipt.
-                        </p>
-                        <button
-                          onClick={() => {
-                            setSelectedParticipant(participant);
-                            setShowReceiptReupload(true);
-                          }}
-                          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
-                        >
-                          Re-upload Receipt
-                        </button>
-                      </div>
+                  {(participant.paymentStatus === 'paid' || participant.paymentStatus === 'offline_paid') ? (
+                    <Link
+                      to={`/qr/${participant.id}`}
+                      className="btn-primary w-full text-center flex items-center justify-center space-x-2"
+                    >
+                      <QrCode className="h-4 w-4" />
+                      <span>View QR Code</span>
+                    </Link>
+                  ) : (
+                    <div className="bg-gray-800/40 border border-gray-700 text-gray-400 text-center rounded-lg py-2 text-sm">
+                      QR Code will be available after payment verification
                     </div>
                   )}
-
-                  <Link
-                    to={`/qr/${participant.id}`}
-                    className="btn-primary w-full text-center flex items-center justify-center space-x-2"
-                  >
-                    <QrCode className="h-4 w-4" />
-                    <span>View QR Code</span>
-                  </Link>
                 </motion.div>
               );
             })}
@@ -271,21 +276,19 @@ const ParticipantDashboard: React.FC = () => {
         )}
       </div>
 
-  {/* Available Events section removed as per request */}
+      {/* Available Events section removed as per request */}
 
       {/* Receipt Re-upload Modal */}
-      {showReceiptReupload && selectedParticipant && (
-        <ReceiptReupload
-          participantId={selectedParticipant.id}
-          eventTitle={events.find(e => e.id === selectedParticipant.eventId)?.title || 'Event'}
-          onSuccess={() => {
-            // Refresh participants data
-            loadData();
-          }}
-          onClose={() => {
-            setShowReceiptReupload(false);
-            setSelectedParticipant(null);
-          }}
+      {showPaymentModal && selectedEvent && selectedParticipantForPayment && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          onPaymentComplete={handlePaymentComplete}
+          eventId={selectedEvent.id}
+          eventTitle={selectedEvent.title}
+          amount={selectedEvent.entryFee}
+          upiId={selectedEvent.upiId || ''}
+          participantId={selectedParticipantForPayment.id}
         />
       )}
     </div>
@@ -293,4 +296,3 @@ const ParticipantDashboard: React.FC = () => {
 };
 
 export default ParticipantDashboard;
-  
