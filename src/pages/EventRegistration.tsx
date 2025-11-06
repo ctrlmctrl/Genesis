@@ -230,7 +230,7 @@ const EventRegistration: React.FC = () => {
     try {
       await dataService.updatePaymentStatus(
         participantId,
-        method === 'online' ? 'pending' : 'offline_paid',
+        method === 'online' ? 'under_verification' : 'offline_paid',
         method,
         receiptUrl
       );

@@ -88,9 +88,16 @@ const ParticipantDashboard: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedParticipantForPayment, setSelectedParticipantForPayment] = useState<Participant | null>(null);
+  const [participantId, setParticipantId] = useState<string>('');
 
   const handlePaymentComplete = async (method: 'online' | 'offline', receiptUrl?: string) => {
     try {
+      await dataService.updatePaymentStatus(
+        participantId,
+        method === 'online' ? 'under_verification' : method === 'offline' ? 'offline_paid' : 'pending',
+        method,
+        receiptUrl
+      );
       // Reload participant data to reflect payment status changes
       await loadData();
       toast.success(`Payment completed successfully via ${method}!`);
@@ -189,7 +196,7 @@ const ParticipantDashboard: React.FC = () => {
                       {participant.paymentStatus === 'paid' ? 'Paid' :
                         participant.paymentStatus === 'offline_paid' ? 'Offline Paid' :
                           participant.paymentStatus === 'under_verification' ? 'Under Review' :
-                            participant.paymentStatus === 'failed' ? 'Failed' : 'Pending'}
+                            participant.paymentStatus === 'failed' ? 'Failed' : 'Reupload Needed'}
                     </span>
                   </div>
 

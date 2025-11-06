@@ -95,9 +95,28 @@ const QRCodeDisplay: React.FC = () => {
     );
   }
 
+  // Helper: Convert backend status to readable label
+  const getReadableStatus = (status: string | undefined): string => {
+    switch (status) {
+      case 'paid':
+        return 'Payment Verified';
+      case 'offline_paid':
+        return 'Offline Payment Verified';
+      case 'under_verification':
+        return 'Under Verification';
+      case 'pending':
+        return 'Payment Pending';
+      case 'failed':
+        return 'Payment Failed - Retry Needed';
+      default:
+        return 'Unknown';
+    }
+  };
+
   // ✅ Helper to check QR visibility
   const isPaymentVerified = participant.paymentStatus === 'paid' || participant.paymentStatus === 'offline_paid';
   const isPaymentPending = participant.paymentStatus === 'under_verification';
+  const isPaymentFailed = participant.paymentStatus === 'failed';
 
   return (
     <div className="mobile-container">
@@ -168,9 +187,11 @@ const QRCodeDisplay: React.FC = () => {
                 ? 'bg-green-100 text-green-800'
                 : isPaymentPending
                   ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-gray-100 text-gray-800'
+                  : isPaymentFailed
+                    ? 'bg-red-100 text-red-800'
+                    : 'bg-gray-100 text-gray-800'
                 }`}>
-                {participant.paymentStatus || 'under_verification'}
+                {getReadableStatus(participant.paymentStatus)}
               </span>
             </p>
 
