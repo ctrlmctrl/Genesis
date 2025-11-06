@@ -27,8 +27,27 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadCodes();
+
+      // 🔹 Function to dynamically set correct price
+      const updateAmount = () => {
+        if (!event) return;
+
+        const newAmount = isWithinOnSpotWindow(event)
+          ? event.onSpotEntryFee ?? event.entryFee ?? 0
+          : event.entryFee ?? 0;
+
+        setAmount(newAmount);
+      };
+
+      // Run immediately
+      updateAmount();
+
+      // Recheck every 60 seconds while modal is open
+      const interval = setInterval(updateAmount, 60000);
+
+      return () => clearInterval(interval);
     }
-  }, [isOpen, event.id]);
+  }, [isOpen, event]);
 
   const loadCodes = async () => {
     const eventCodes = await offlineCodeService.getCodesByEvent(event.id);
@@ -110,6 +129,17 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
   }, []);
 
   if (!isOpen) return null;
+
+  // Helper: Determine if on-the-spot registration is active
+  const isWithinOnSpotWindow = (event: Event): boolean => {
+    if (!event.allowOnSpotRegistration) return false;
+    if (!event.date || !event.onSpotStartTime || !event.onSpotEndTime) return false;
+
+    const now = new Date();
+    const start = new Date(`${event.date}T${event.onSpotStartTime}`);
+    const end = new Date(`${event.date}T${event.onSpotEndTime}`);
+    return now >= start && now <= end;
+  };
 
   return (
     <motion.div

@@ -5,9 +5,10 @@ import { PaymentDetails } from '../services/paymentService';
 import { paymentService } from '../services/paymentService';
 import { fileUploadService } from '../services/fileUploadService';
 import { offlineCodeService } from '../services/offlineCodeService';
+import type { Event as GenesisEvent } from '../types';
 import toast from 'react-hot-toast';
-import { updateDoc, doc} from 'firebase/firestore';
-import {db} from '../firebase';
+import { updateDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ interface PaymentModalProps {
   amount: number;
   upiId: string;
   participantId?: string;
+  event: GenesisEvent | null;
 }
 
 const PaymentModal: React.FC<PaymentModalProps> = ({
@@ -29,6 +31,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   amount,
   upiId,
   participantId,
+  event,
 }) => {
   const [qrCodeDataURL, setQrCodeDataURL] = useState<string>('');
   const [selectedMethod, setSelectedMethod] = useState<'online' | 'offline'>('online');
@@ -36,6 +39,43 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [offlineCode, setOfflineCode] = useState('');
   const [isValidatingCode, setIsValidatingCode] = useState(false);
+
+  const isWithinOnSpotWindow = (event: GenesisEvent): boolean => {
+    if (!event.allowOnSpotRegistration) return false;
+    if (!event.date || !event.onSpotStartTime || !event.onSpotEndTime) return false;
+
+    const now = new Date();
+    const start = new Date(`${event.date}T${event.onSpotStartTime}`);
+    const end = new Date(`${event.date}T${event.onSpotEndTime}`);
+    return now >= start && now <= end;
+  };
+
+  // Determine allowed payment methods dynamically
+  const allowedMethods = (() => {
+    if (!event) return ['online', 'offline']; // fallback
+
+    const isOnSpotNow = isWithinOnSpotWindow(event);
+
+    const method = isOnSpotNow
+      ? event.onSpotPaymentMethod || event.paymentMethod
+      : event.paymentMethod;
+
+    switch (method) {
+      case 'online':
+        return ['online'];
+      case 'offline':
+        return ['offline'];
+      case 'both':
+      default:
+        return ['online', 'offline'];
+    }
+  })();
+
+  useEffect(() => {
+    if (allowedMethods.length === 1) {
+      setSelectedMethod(allowedMethods[0] as 'online' | 'offline');
+    }
+  }, [allowedMethods]);
 
   const generatePaymentQR = useCallback(async () => {
     const paymentDetails: PaymentDetails = {
@@ -123,7 +163,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         receiptUrl = await fileUploadService.uploadReceipt(receiptFile, participantId);
         toast.success('Receipt uploaded successfully!');
       }
-      
+
       // ✅ Update participant payment status to 'underVerification'
       if (participantId && receiptUrl) {
         const participantRef = doc(db, 'participants', participantId);
@@ -193,27 +233,32 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
             {/* Payment Method Selection */}
             <div className="space-y-3">
               <h4 className="font-semibold text-white">Payment Method</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setSelectedMethod('online')}
-                  className={`p-3 rounded-lg border transition-all ${selectedMethod === 'online'
-                    ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
-                    : 'border-gray-600 text-gray-400 hover:border-gray-500'
-                    }`}
-                >
-                  <QrCode className="h-6 w-6 mx-auto mb-2" />
-                  <span className="text-sm font-medium">Online UPI</span>
-                </button>
-                <button
-                  onClick={() => setSelectedMethod('offline')}
-                  className={`p-3 rounded-lg border transition-all ${selectedMethod === 'offline'
-                    ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
-                    : 'border-gray-600 text-gray-400 hover:border-gray-500'
-                    }`}
-                >
-                  <Upload className="h-6 w-6 mx-auto mb-2" />
-                  <span className="text-sm font-medium">Offline</span>
-                </button>
+              <div className={`grid gap-3 ${allowedMethods.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                {allowedMethods.includes('online') && (
+                  <button
+                    onClick={() => setSelectedMethod('online')}
+                    className={`p-3 rounded-lg border transition-all ${selectedMethod === 'online'
+                      ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
+                      : 'border-gray-600 text-gray-400 hover:border-gray-500'
+                      }`}
+                  >
+                    <QrCode className="h-6 w-6 mx-auto mb-2" />
+                    <span className="text-sm font-medium">Online UPI</span>
+                  </button>
+                )}
+
+                {allowedMethods.includes('offline') && (
+                  <button
+                    onClick={() => setSelectedMethod('offline')}
+                    className={`p-3 rounded-lg border transition-all ${selectedMethod === 'offline'
+                      ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
+                      : 'border-gray-600 text-gray-400 hover:border-gray-500'
+                      }`}
+                  >
+                    <Upload className="h-6 w-6 mx-auto mb-2" />
+                    <span className="text-sm font-medium">Offline</span>
+                  </button>
+                )}
               </div>
             </div>
 

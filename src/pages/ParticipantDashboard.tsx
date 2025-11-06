@@ -289,6 +289,7 @@ const ParticipantDashboard: React.FC = () => {
           amount={selectedEvent.entryFee}
           upiId={selectedEvent.upiId || ''}
           participantId={selectedParticipantForPayment.id}
+          event={selectedEvent}
         />
       )}
     </div>

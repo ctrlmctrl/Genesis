@@ -28,6 +28,7 @@ const VolunteerScanner: React.FC = () => {
     return () => {
       if (scannerRef.current) {
         scannerRef.current.destroy();
+        scannerRef.current = null;
       }
     };
   }, []);

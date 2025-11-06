@@ -446,26 +446,26 @@ class DataService {
     return found;
   }
 
-async getTeamMembers(teamId: string): Promise<Participant[]> {
-  console.log('Fetching team members for team ID:', teamId);
+  async getTeamMembers(teamId: string): Promise<Participant[]> {
+    console.log('Fetching team members for team ID:', teamId);
 
-  if (this.useFirebase) {
-    try {
-      const q = query(collection(db, 'participants'), where('teamId', '==', teamId));
-      const querySnapshot = await getDocs(q);
-      console.log('Firebase team query found:', querySnapshot.docs.length, 'documents');
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Participant));
-    } catch (error) {
-      console.error('Error fetching team members from Firebase:', error);
-      return [];
+    if (this.useFirebase) {
+      try {
+        const q = query(collection(db, 'participants'), where('teamId', '==', teamId));
+        const querySnapshot = await getDocs(q);
+        console.log('Firebase team query found:', querySnapshot.docs.length, 'documents');
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Participant));
+      } catch (error) {
+        console.error('Error fetching team members from Firebase:', error);
+        return [];
+      }
     }
-  }
 
-  // LocalStorage fallback
-  const members = this.participants.filter(p => p.teamId === teamId);
-  console.log('Found team members locally:', members.length);
-  return members;
-}
+    // LocalStorage fallback
+    const members = this.participants.filter(p => p.teamId === teamId);
+    console.log('Found team members locally:', members.length);
+    return members;
+  }
 
   async getParticipants(): Promise<Participant[]> {
     if (this.useFirebase) {
@@ -679,6 +679,18 @@ async getTeamMembers(teamId: string): Promise<Participant[]> {
 
   async getParticipantsByTeam(teamId: string): Promise<Participant[]> {
     return this.participants.filter(p => p.teamId === teamId);
+  }
+
+  async getParticipantByEventAndEmail(eventId: string, email: string) {
+    const q = query(
+      collection(db, "participants"),
+      where("eventId", "==", eventId),
+      where("email", "==", email)
+    );
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return null;
+
+    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Participant;
   }
 
   async updateParticipantInfo(participantId: string, info: ParticipantInfo): Promise<Participant | null> {

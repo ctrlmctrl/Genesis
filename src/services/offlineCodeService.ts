@@ -11,6 +11,17 @@ import {
 } from "firebase/firestore";
 import { dataService } from "./dataService";
 
+// Helper: determine if on-the-spot pricing applies
+const isWithinOnSpotWindow = (event: any): boolean => {
+  if (!event.allowOnSpotRegistration) return false;
+  if (!event.date || !event.onSpotStartTime || !event.onSpotEndTime) return false;
+
+  const now = new Date();
+  const start = new Date(`${event.date}T${event.onSpotStartTime}`);
+  const end = new Date(`${event.date}T${event.onSpotEndTime}`);
+  return now >= start && now <= end;
+};
+
 export interface OfflinePaymentCode {
   id?: string;
   code: string;
@@ -122,10 +133,30 @@ export class OfflineCodeService {
         return { isValid: false, error: "This code has expired." };
       }
 
-      if (data.amount !== eventFee) {
+      // ✅ Safely fetch event details
+      const event = await dataService.getEvent(eventId);
+
+      if (!event) {
+        // Fallback: use provided eventFee if event not found
+        return {
+          isValid: data.amount === eventFee,
+          codeData: data.amount === eventFee ? { id: docSnap.id, ...data } : undefined,
+          error:
+            data.amount === eventFee
+              ? undefined
+              : `Event not found. Code amount (₹${data.amount}) does not match expected (₹${eventFee}).`,
+        };
+      }
+
+      // ✅ Determine correct active fee (regular or on-spot)
+      const activeFee = isWithinOnSpotWindow(event)
+        ? event.onSpotEntryFee ?? event.entryFee
+        : event.entryFee;
+
+      if (data.amount !== activeFee) {
         return {
           isValid: false,
-          error: `Code amount (₹${data.amount}) does not match event fee (₹${eventFee}).`,
+          error: `Code amount (₹${data.amount}) does not match current event fee (₹${activeFee}).`,
         };
       }
 
@@ -217,7 +248,7 @@ export class OfflineCodeService {
     unused: number;
     expired: number;
   }> {
-    const snapshot = await getDocs(collection(db, 'offlinePaymentCodes'));
+    const snapshot = await getDocs(collection(db, 'offline_payment_codes'));
     const codes = snapshot.docs.map(doc => doc.data() as OfflinePaymentCode);
     const now = new Date();
 

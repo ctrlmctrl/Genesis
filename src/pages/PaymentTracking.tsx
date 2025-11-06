@@ -408,7 +408,7 @@ const PaymentTracking: React.FC = () => {
                 )}
               </div>
 
-              {verificationParticipant.paymentStatus === 'pending' && (
+              {(verificationParticipant.paymentStatus === 'pending'|| verificationParticipant.paymentStatus === 'under_verification') && (
                 <div className="mt-4 flex space-x-2">
                   <button
                     onClick={() => handleMarkAsPaid(verificationParticipant, 'paid')}

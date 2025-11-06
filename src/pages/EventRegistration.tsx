@@ -35,6 +35,17 @@ const EventRegistration: React.FC = () => {
     timeRemaining?: string;
   }>({ canRegister: true });
   const [registrationType, setRegistrationType] = useState<'regular' | 'on_spot'>('regular');
+  const isWithinOnSpotWindow = (event: Event): boolean => {
+    if (!event.allowOnSpotRegistration) return false;
+    if (!event.date || !event.onSpotStartTime || !event.onSpotEndTime) return false;
+
+    const now = new Date();
+
+    // Combine event date with time fields
+    const start = new Date(`${event.date}T${event.onSpotStartTime}`);
+    const end = new Date(`${event.date}T${event.onSpotEndTime}`);
+    return now >= start && now <= end;
+  };
   const [showTeamForm, setShowTeamForm] = useState(false);
   // Team registration state (inlined)
   const [teamName, setTeamName] = useState('');
@@ -109,7 +120,17 @@ const EventRegistration: React.FC = () => {
     setSubmitting(true);
     try {
       // Get the appropriate entry fee for the registration type
-      const entryFee = getEntryFee(event, registrationType);
+      const entryFee = price;
+      // Check if user already registered for this event
+      const existingParticipant = await dataService.getParticipantByEventAndEmail(event.id, user?.email || '');
+
+      if (existingParticipant) {
+        toast('You already registered for this event. Complete your payment to continue.', { icon: '⚠️' });
+        setParticipantId(existingParticipant.id);
+        setShowPaymentModal(true);
+        setSubmitting(false);
+        return;
+      }
 
       const participant = await dataService.registerParticipant({
         eventId: event.id,
@@ -122,7 +143,7 @@ const EventRegistration: React.FC = () => {
       setParticipantId(participant.id);
 
       // If event has entry fee, show payment modal
-      if (entryFee > 0) {
+      if (event.entryFee > 0) {
         setShowPaymentModal(true);
       } else {
         toast.success('Registration successful!');
@@ -259,6 +280,10 @@ const EventRegistration: React.FC = () => {
     );
   }
 
+  const price = isWithinOnSpotWindow(event)
+    ? event.onSpotEntryFee
+    : event.entryFee;
+
   if (!isAuthenticated) {
     return (
       <div className="mobile-container">
@@ -300,7 +325,7 @@ const EventRegistration: React.FC = () => {
       {/* Event Details */}
       <div className="card-glow mb-6">
         <h2 className="text-xl font-semibold text-white mb-3">{event.title}</h2>
-        <p className="text-gray-300 mb-4">{event.description}</p>
+        <p className="text-gray-300 mb-4 whitespace-pre-line">{event.description}</p>
 
         <div className="space-y-3">
           <div className="flex items-center text-sm text-gray-400">
@@ -311,16 +336,10 @@ const EventRegistration: React.FC = () => {
             <Clock className="h-4 w-4 mr-3 text-cyan-400" />
             {event.time}
           </div>
-          {event.roomNo && (
-            <div className="flex items-center text-sm text-gray-400">
-              <MapPin className="h-4 w-4 mr-3 text-cyan-400" />
-              Room: {event.roomNo}
-            </div>
-          )}
           {event.entryFee > 0 && (
             <div className="flex items-center text-sm text-cyan-400">
               <DollarSign className="h-4 w-4 mr-3" />
-              Entry Fee: ₹{event.entryFee}
+              Entry Fee: ₹{price}
             </div>
           )}
         </div>
@@ -365,7 +384,7 @@ const EventRegistration: React.FC = () => {
                       )}
                     </div>
                   ) : (
-                    <span>Entry fee: ₹{event.entryFee}</span>
+                    <span>Entry fee: ₹{price}</span>
                   )}
                 </div>
               )}
@@ -404,7 +423,7 @@ const EventRegistration: React.FC = () => {
                   <p className="text-gray-300">One-time team payment</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-semibold text-white">₹{event.entryFee}</div>
+                  <div className="text-lg font-semibold text-white">₹{price}</div>
                   <div className="text-sm text-gray-400">{event.paymentMethod === 'both' ? 'Online/Offline' : event.paymentMethod}</div>
                 </div>
               </div>
@@ -576,9 +595,10 @@ const EventRegistration: React.FC = () => {
           onPaymentComplete={handlePaymentComplete}
           eventId={event.id}
           eventTitle={event.title}
-          amount={getEntryFee(event, registrationType)}
+          amount={price ?? 0}
           upiId={event.upiId || 'genesis@upi'}
           participantId={participantId}
+          event={event}
         />
       )}
 

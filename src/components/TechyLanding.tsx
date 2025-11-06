@@ -64,6 +64,18 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
     return true;
   };
 
+  const isWithinOnSpotWindow = (event: Event): boolean => {
+    if (!event.allowOnSpotRegistration) return false;
+    if (!event.date || !event.onSpotStartTime || !event.onSpotEndTime) return false;
+
+    const now = new Date();
+
+    // Combine event date with time fields
+    const start = new Date(`${event.date}T${event.onSpotStartTime}`);
+    const end = new Date(`${event.date}T${event.onSpotEndTime}`);
+    return now >= start && now <= end;
+  };
+
   return (
     <div className="min-h-screen tech-bg">
       {/* Animated Background Elements */}
@@ -272,81 +284,86 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                     <div className="w-24 h-1 bg-gradient-to-r from-cyan-500 to-blue-500 mx-auto rounded-full"></div>
                   </div>
 
-                  {day1Events.map((event, index) => (
-                    <motion.div
-                      key={event.id}
-                      className="card-glow hover:scale-105 transition-all duration-300 group"
-                      initial={{ opacity: 0, y: 50 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 1.6 + index * 0.1, duration: 0.5 }}
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-cyan-300 transition-colors">
-                            {event.title}
-                          </h3>
-                          <p className="text-gray-300 mb-4 whitespace-pre-line">{event.description}</p>
-                        </div>
-                        <div className="flex items-center text-cyan-400 ml-4">
-                          <Calendar className="h-5 w-5 mr-1" />
-                          <span className="text-sm font-medium">Day 1</span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3 mb-6">
-                        <div className="flex items-center text-gray-400">
-                          <Calendar className="h-4 w-4 mr-3 text-cyan-400" />
-                          {new Date(event.date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
-                        </div>
-
-                        {/* Room number hidden until participant is verified */}
-
-                        {event.entryFee > 0 && (
-                          <div className="flex items-center text-cyan-400">
-                            <DollarSign className="h-4 w-4 mr-3" />
-                            Entry Fee: ₹{event.entryFee}
+                  {day1Events.map((event, index) => {
+                    const price = isWithinOnSpotWindow(event)
+                      ? event.onSpotEntryFee
+                      : event.entryFee;
+                    return (
+                      <motion.div
+                        key={event.id}
+                        className="card-glow hover:scale-105 transition-all duration-300 group"
+                        initial={{ opacity: 0, y: 50 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 1.6 + index * 0.1, duration: 0.5 }}
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-cyan-300 transition-colors">
+                              {event.title}
+                            </h3>
+                            <p className="text-gray-300 mb-4 whitespace-pre-line">{event.description}</p>
                           </div>
-                        )}
-
-                        {event.isTeamEvent && (
-                          <div className="flex items-center text-purple-400">
-                            <Users className="h-4 w-4 mr-3" />
-                            Team Event ({event.membersPerTeam} members)
+                          <div className="flex items-center text-cyan-400 ml-4">
+                            <Calendar className="h-5 w-5 mr-1" />
+                            <span className="text-sm font-medium">Day 1</span>
                           </div>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        {isRegistrationOpen(event) ? (
-                          <>
-                            <div className="flex items-center text-sm text-cyan-400">
-                              <div className="w-2 h-2 bg-cyan-400 rounded-full mr-2 animate-pulse"></div>
-                              Registration Open
+                        </div>
+
+                        <div className="space-y-3 mb-6">
+                          <div className="flex items-center text-gray-400">
+                            <Calendar className="h-4 w-4 mr-3 text-cyan-400" />
+                            {new Date(event.date).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </div>
+
+                          {/* Room number hidden until participant is verified */}
+
+                          {event.entryFee > 0 && (
+                            <div className="flex items-center text-cyan-400">
+                              <DollarSign className="h-4 w-4 mr-3" />
+                              Entry Fee: ₹{price}
                             </div>
+                          )}
 
-                            <div className="flex items-center space-x-3">
-                              {isAuthenticated ? (
-                                <Link to={`/register/${event.id}`} className="btn-primary">
-                                  Register Now
-                                </Link>
-                              ) : (
-                                <div className="text-sm text-gray-400">Sign in required</div>
-                              )}
+                          {event.isTeamEvent && (
+                            <div className="flex items-center text-purple-400">
+                              <Users className="h-4 w-4 mr-3" />
+                              Team Event ({event.membersPerTeam} members)
                             </div>
-                          </>
-                        ) : (
-                          <div className="flex items-center text-sm text-red-400">
-                            <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
-                            Registration Closed
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          {isRegistrationOpen(event) ? (
+                            <>
+                              <div className="flex items-center text-sm text-cyan-400">
+                                <div className="w-2 h-2 bg-cyan-400 rounded-full mr-2 animate-pulse"></div>
+                                Registration Open
+                              </div>
+
+                              <div className="flex items-center space-x-3">
+                                {isAuthenticated ? (
+                                  <Link to={`/register/${event.id}`} className="btn-primary">
+                                    Register Now
+                                  </Link>
+                                ) : (
+                                  <div className="text-sm text-gray-400">Sign in required</div>
+                                )}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex items-center text-sm text-red-400">
+                              <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+                              Registration Closed
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )
+                  })}
                 </motion.div>
               )}
 
@@ -368,82 +385,88 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                     <div className="w-24 h-1 bg-gradient-to-r from-purple-500 to-pink-500 mx-auto rounded-full"></div>
                   </div>
 
-                  {day2Events.map((event, index) => (
-                    <motion.div
-                      key={event.id}
-                      className="card-glow hover:scale-105 transition-all duration-300 group"
-                      initial={{ opacity: 0, y: 50 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 2.0 + index * 0.1, duration: 0.5 }}
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-purple-300 transition-colors">
-                            {event.title}
-                          </h3>
-                          <p className="text-gray-300 mb-4 whitespace-pre-line">{event.description}</p>
-                        </div>
-                        <div className="flex items-center text-purple-400 ml-4">
-                          <Calendar className="h-5 w-5 mr-1" />
-                          <span className="text-sm font-medium">Day 2</span>
-                        </div>
-                      </div>
+                  {day2Events.map((event, index) => {
+                    const price = isWithinOnSpotWindow(event)
+                      ? event.onSpotEntryFee
+                      : event.entryFee;
 
-                      <div className="space-y-3 mb-6">
-                        <div className="flex items-center text-gray-400">
-                          <Calendar className="h-4 w-4 mr-3 text-purple-400" />
-                          {new Date(event.date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
-                        </div>
-
-                        {/* Room number hidden until participant is verified */}
-
-                        {event.entryFee > 0 && (
-                          <div className="flex items-center text-purple-400">
-                            <DollarSign className="h-4 w-4 mr-3" />
-                            Entry Fee: ₹{event.entryFee}
+                    return (
+                      <motion.div
+                        key={event.id}
+                        className="card-glow hover:scale-105 transition-all duration-300 group"
+                        initial={{ opacity: 0, y: 50 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 2.0 + index * 0.1, duration: 0.5 }}
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-purple-300 transition-colors">
+                              {event.title}
+                            </h3>
+                            <p className="text-gray-300 mb-4 whitespace-pre-line">{event.description}</p>
                           </div>
-                        )}
-
-                        {event.isTeamEvent && (
-                          <div className="flex items-center text-purple-400">
-                            <Users className="h-4 w-4 mr-3" />
-                            Team Event ({event.membersPerTeam} members)
+                          <div className="flex items-center text-purple-400 ml-4">
+                            <Calendar className="h-5 w-5 mr-1" />
+                            <span className="text-sm font-medium">Day 2</span>
                           </div>
-                        )}
-                      </div>
+                        </div>
 
-                      <div className="flex items-center justify-between">
-                        {isRegistrationOpen(event) ? (
-                          <>
-                            <div className="flex items-center text-sm text-cyan-400">
-                              <div className="w-2 h-2 bg-cyan-400 rounded-full mr-2 animate-pulse"></div>
-                              Registration Open
+                        <div className="space-y-3 mb-6">
+                          <div className="flex items-center text-gray-400">
+                            <Calendar className="h-4 w-4 mr-3 text-purple-400" />
+                            {new Date(event.date).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </div>
+
+                          {/* Room number hidden until participant is verified */}
+
+                          {event.entryFee > 0 && (
+                            <div className="flex items-center text-purple-400">
+                              <DollarSign className="h-4 w-4 mr-3" />
+                              Entry Fee: ₹{price}
                             </div>
+                          )}
 
-                            <div className="flex items-center space-x-3">
-                              {isAuthenticated ? (
-                                <Link to={`/register/${event.id}`} className="btn-primary">
-                                  Register Now
-                                </Link>
-                              ) : (
-                                <div className="text-sm text-gray-400">Sign in required</div>
-                              )}
+                          {event.isTeamEvent && (
+                            <div className="flex items-center text-purple-400">
+                              <Users className="h-4 w-4 mr-3" />
+                              Team Event ({event.membersPerTeam} members)
                             </div>
-                          </>
-                        ) : (
-                          <div className="flex items-center text-sm text-red-400">
-                            <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
-                            Registration Closed
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          {isRegistrationOpen(event) ? (
+                            <>
+                              <div className="flex items-center text-sm text-cyan-400">
+                                <div className="w-2 h-2 bg-cyan-400 rounded-full mr-2 animate-pulse"></div>
+                                Registration Open
+                              </div>
+
+                              <div className="flex items-center space-x-3">
+                                {isAuthenticated ? (
+                                  <Link to={`/register/${event.id}`} className="btn-primary">
+                                    Register Now
+                                  </Link>
+                                ) : (
+                                  <div className="text-sm text-gray-400">Sign in required</div>
+                                )}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex items-center text-sm text-red-400">
+                              <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+                              Registration Closed
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )
+                  })}
                 </motion.div>
               )}
             </>
