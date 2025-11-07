@@ -214,7 +214,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
             </h2>
             <div className="space-y-3">
               <p className="text-lg text-gray-300">
-                <strong className="text-cyan-400">Genesis Techno Fiesta 2025</strong>
+                <strong className="text-cyan-400">Genesis Techno Fiesta 2.0 2025</strong>
               </p>
               <p className="text-gray-400">
                 November 14-15, 2025
