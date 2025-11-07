@@ -117,17 +117,17 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
             transition={{ duration: 4, repeat: Infinity }}
           >
             <Sparkles className="h-12 w-12 text-cyan-400 mr-4" />
-            <h1 className="text-5xl font-bold neon-text">GENESIS</h1>
+            <h1 className="text-5xl font-bold neon-text">GENESIS<br/>Techno Fiesta 2.0</h1>
             <Sparkles className="h-12 w-12 text-cyan-400 ml-4" />
           </motion.div>
-          <motion.p
+          {/* <motion.p
             className="text-xl text-gray-300 mb-8"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5, duration: 0.8 }}
           >
             Beyond Excellence
-          </motion.p>
+          </motion.p> */}
 
           {!isAuthenticated ? (
             <motion.div
@@ -214,7 +214,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
             </h2>
             <div className="space-y-3">
               <p className="text-lg text-gray-300">
-                <strong className="text-cyan-400">Genesis Tech Fest 2025</strong>
+                <strong className="text-cyan-400">Genesis Techno Fiesta 2025</strong>
               </p>
               <p className="text-gray-400">
                 November 14-15, 2025
@@ -279,8 +279,8 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                       <Calendar className="h-8 w-8 mr-3 text-cyan-400" />
                       Day 1 Events
                     </h2>
-                    <p className="text-lg text-cyan-300 mb-4">From strategy to success</p>
-                    <p className="text-gray-400 mb-6">Begin your Genesis experience with exciting workshops and competitions</p>
+                    <p className="text-lg text-cyan-300 mb-4">Ignite the Spark - Ideas that Build Tomorrow</p>
+                    <p className="text-gray-400 mb-6">Begin your Genesis experience with exciting competitions</p>
                     <div className="w-24 h-1 bg-gradient-to-r from-cyan-500 to-blue-500 mx-auto rounded-full"></div>
                   </div>
 
@@ -380,7 +380,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
                       <Calendar className="h-8 w-8 mr-3 text-purple-400" />
                       Day 2 Events
                     </h2>
-                    <p className="text-lg text-purple-300 mb-4">From code to creation</p>
+                    <p className="text-lg text-purple-300 mb-4">Code the Future - Beyond Boundaries</p>
                     <p className="text-gray-400 mb-6">Continue your journey with advanced challenges and grand finale competitions</p>
                     <div className="w-24 h-1 bg-gradient-to-r from-purple-500 to-pink-500 mx-auto rounded-full"></div>
                   </div>
