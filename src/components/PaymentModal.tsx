@@ -169,7 +169,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         const participantRef = doc(db, 'participants', participantId);
         await updateDoc(participantRef, {
           paymentStatus: 'under_verification',
-          paymentReceipt: receiptUrl,
+          receiptUrl: receiptUrl,
           paymentMethod: selectedMethod,
           paymentTimestamp: new Date().toISOString(),
         });

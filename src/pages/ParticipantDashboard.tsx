@@ -238,6 +238,7 @@ const ParticipantDashboard: React.FC = () => {
                         onClick={() => {
                           setSelectedEvent(event || null);
                           setSelectedParticipantForPayment(participant);
+                          setParticipantId(participant.id);
                           setShowPaymentModal(true);
                         }}
                         className="btn-primary w-full text-center flex items-center justify-center space-x-2"
