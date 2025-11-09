@@ -117,7 +117,7 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
             transition={{ duration: 4, repeat: Infinity }}
           >
             <Sparkles className="h-12 w-12 text-cyan-400 mr-4" />
-            <h1 className="text-5xl font-bold neon-text">GENESIS<br/>Techno Fiesta 2.0</h1>
+            <h1 className="text-5xl font-bold neon-text">GENESIS<br />Techno Fiesta 2.0</h1>
             <Sparkles className="h-12 w-12 text-cyan-400 ml-4" />
           </motion.div>
           {/* <motion.p
@@ -183,18 +183,29 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
           >
             <Link
               to="/participant"
-              className="card-glow hover:scale-105 transition-all duration-300 group"
+              className="relative card-glow hover:scale-105 transition-all duration-300 group"
             >
+              {/* Badge showing number of registrations */}
+              {participants.length > 0 && (
+                <div className="absolute top-3 right-3 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg animate-pulse">
+                  {participants.length}
+                </div>
+              )}
+
               <div className="text-center">
                 <motion.div
-                  className="mb-4"
+                  className="mb-4 relative inline-block"
                   whileHover={{ rotate: 360 }}
                   transition={{ duration: 0.5 }}
                 >
                   <User className="h-12 w-12 mx-auto text-green-400 group-hover:text-green-300" />
                 </motion.div>
                 <h3 className="text-xl font-semibold text-white mb-2">My Events</h3>
-                <p className="text-gray-400">View your registrations and QR codes</p>
+                <p className="text-gray-400">
+                  {participants.length > 0
+                    ? `You have ${participants.length} registered ${participants.length === 1 ? 'event' : 'events'}`
+                    : 'View your registrations and QR codes'}
+                </p>
               </div>
             </Link>
           </motion.div>
@@ -471,6 +482,26 @@ const TechyLanding: React.FC<TechyLandingProps> = ({ events, participants, loadi
               )}
             </>
           )}
+        </motion.div>
+        <motion.div
+          className="card-glow p-6 mt-16 bg-gray-900/60 border border-cyan-700/30 text-center"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 2.2, duration: 0.8 }}
+        >
+          <h3 className="text-xl font-semibold text-cyan-300 mb-3">
+            Important Notice for Participants
+          </h3>
+          <p className="text-gray-300 leading-relaxed">
+            Kindly note that a <span className="text-yellow-400 font-semibold">minimum of 5 entries</span> are required for an event to commence.
+            <br />
+            In case of fewer registrations or any unforeseen issue from our
+            <span className="text-cyan-400 font-semibold"> college’s side</span>, and the event gets cancelled, a
+            <span className="text-green-400 font-semibold"> full refund</span> will be provided after verification.
+            <br />
+            Additionally, the <span className="text-purple-400 font-semibold">runner-up cash prize</span> will only be declared if the number of entries exceeds
+            <span className="text-yellow-400 font-semibold"> 10 participants.</span>
+          </p>
         </motion.div>
         <motion.div
           className="text-center mt-10">

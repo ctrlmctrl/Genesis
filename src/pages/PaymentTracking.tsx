@@ -7,6 +7,8 @@ import { roleAuthService, RoleUser } from '../services/roleAuth';
 import RoleLogin from '../components/RoleLogin';
 import OfflineCodeGenerator from '../components/OfflineCodeGenerator';
 import toast from 'react-hot-toast';
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase";
 
 const PaymentTracking: React.FC = () => {
   const navigate = useNavigate();
@@ -33,12 +35,37 @@ const PaymentTracking: React.FC = () => {
 
   useEffect(() => {
     const currentUser = roleAuthService.getCurrentUser();
-    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'volunteer')) {
-      setUser(currentUser);
-      loadData();
-    } else {
+    if (!(currentUser && (currentUser.role === 'admin' || currentUser.role === 'volunteer'))) {
       setLoading(false);
+      return;
     }
+
+    setUser(currentUser);
+
+    // 🔥 Real-time listener for participants
+    const unsubscribeParticipants = onSnapshot(collection(db, "participants"), (snapshot) => {
+      const participantList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Participant[];
+      setParticipants(participantList);
+    });
+
+    // 🔥 Real-time listener for events (optional, helps for event titles)
+    const unsubscribeEvents = onSnapshot(collection(db, "events"), (snapshot) => {
+      const eventList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Event[];
+      setEvents(eventList);
+      setLoading(false);
+    });
+
+    // Cleanup on unmount
+    return () => {
+      unsubscribeParticipants();
+      unsubscribeEvents();
+    };
   }, []);
 
   const loadData = async () => {
@@ -258,13 +285,24 @@ const PaymentTracking: React.FC = () => {
     return sortOrder === 'asc' ? comparison : -comparison;
   });
 
+  // ✅ Count each team only once (team lead counts as one entry)
+  const getEntries = (status?: string) => {
+    // Filter only team leads OR solo participants
+    const validEntries = participants.filter(p => {
+      if (p.teamId && !p.isTeamLead) return false; // skip team members
+      if (status && p.paymentStatus !== status) return false;
+      return true;
+    });
+    return validEntries.length;
+  };
+
   const paymentStats = {
-    total: participants.length,
-    pending: participants.filter(p => p.paymentStatus === 'pending').length,
-    under_verification: participants.filter(p => p.paymentStatus === 'under_verification').length,
-    paid: participants.filter(p => p.paymentStatus === 'paid').length,
-    offline_paid: participants.filter(p => p.paymentStatus === 'offline_paid').length,
-    failed: participants.filter(p => p.paymentStatus === 'failed').length,
+    total: getEntries(),
+    pending: getEntries('pending'),
+    under_verification: getEntries('under_verification'),
+    paid: getEntries('paid'),
+    offline_paid: getEntries('offline_paid'),
+    failed: getEntries('failed'),
   };
 
   if (loading) {
@@ -408,7 +446,7 @@ const PaymentTracking: React.FC = () => {
                 )}
               </div>
 
-              {(verificationParticipant.paymentStatus === 'pending'|| verificationParticipant.paymentStatus === 'under_verification') && (
+              {(verificationParticipant.paymentStatus === 'under_verification') && (
                 <div className="mt-4 flex space-x-2">
                   <button
                     onClick={() => handleMarkAsPaid(verificationParticipant, 'paid')}
@@ -584,6 +622,39 @@ const PaymentTracking: React.FC = () => {
                       {getStatusIcon(participant.paymentStatus)}
                       <span className="ml-2 capitalize">{participant.paymentStatus.replace('_', ' ')}</span>
                     </div>
+
+                    {/* Delete Button (Admin only) */}
+                    {user?.role === 'admin' && (
+                      <button
+                        onClick={async () => {
+                          const confirmDelete = window.confirm(
+                            participant.teamId
+                              ? `⚠️ This participant is part of the team "${participant.teamName}". Deleting will remove the entire team and all its members.\n\nAre you sure you want to proceed?`
+                              : `Are you sure you want to delete participant "${participant.fullName}"?`
+                          );
+
+                          if (!confirmDelete) return;
+
+                          try {
+                            await dataService.deleteParticipant(participant.id);
+                            toast.success(
+                              participant.teamId
+                                ? `Team "${participant.teamName}" and its members deleted successfully`
+                                : `Participant "${participant.fullName}" deleted successfully`
+                            );
+
+                            // Refresh data (optional)
+                            loadData();
+                          } catch (error) {
+                            console.error("Error deleting participant:", error);
+                            toast.error("Failed to delete participant");
+                          }
+                        }}
+                        className="mt-2 bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded-lg transition-colors"
+                      >
+                        Delete
+                      </button>
+                    )}
 
                     {participant.isVerified && (
                       <div className="px-2 py-1 rounded-full text-xs font-medium text-green-400 bg-green-400/10 flex items-center">

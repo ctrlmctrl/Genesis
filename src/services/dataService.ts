@@ -11,7 +11,8 @@ import {
   updateDoc,
   query,
   where,
-  deleteDoc
+  deleteDoc,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -529,7 +530,7 @@ class DataService {
     return uniqueTeams.size;
   }
 
-  async registerTeam(eventId: string, teamName: string, teamMembers: Omit<Participant, 'id' | 'eventId' | 'qrCode' | 'registrationDate' | 'isVerified' | 'paymentStatus'>[]): Promise<Participant[]> {
+  async registerTeam(eventId: string, teamName: string, teamMembers: Participant[]): Promise<Participant[]> {
     if (this.useFirebase) {
       return this.registerTeamFirebase(eventId, teamName, teamMembers);
     }
@@ -586,94 +587,185 @@ class DataService {
     return registeredMembers;
   }
 
-  private async registerTeamFirebase(eventId: string, teamName: string, teamMembers: Omit<Participant, 'id' | 'eventId' | 'qrCode' | 'registrationDate' | 'isVerified' | 'paymentStatus'>[]): Promise<Participant[]> {
+  private async registerTeamFirebase(eventId: string, teamName: string, teamMembers: Participant[]): Promise<Participant[]> {
     try {
-      // Check if event exists and is a team event
+      // 🔹 Validate event
       const event = await this.getEvent(eventId);
-      if (!event) {
-        throw new Error('Event not found');
-      }
-
-      if (!event.isTeamEvent) {
-        throw new Error('This is not a team event');
-      }
+      if (!event) throw new Error('Event not found');
+      if (!event.isTeamEvent) throw new Error('This is not a team event');
 
       const requiredMembers = event.membersPerTeam || 1;
-      if (teamMembers.length < 1) {
-        throw new Error('Team must have at least one member');
-      }
-      if (teamMembers.length > requiredMembers) {
+      if (teamMembers.length < 1) throw new Error('Team must have at least one member');
+      if (teamMembers.length > requiredMembers)
         throw new Error(`Team cannot have more than ${requiredMembers} members`);
-      }
 
       const teamId = `team-${Date.now()}`;
       const registeredMembers: Participant[] = [];
+      const eventTitle = event.title || 'Untitled Event';
 
       for (let i = 0; i < teamMembers.length; i++) {
         const member = teamMembers[i];
         const uniqueQRCode = QRCodeService.generateUniqueQRCode();
+        const timestamp = new Date().toISOString();
 
-        // Only add optional fields if they are defined
         const participantDoc: any = {
           eventId,
-          fullName: member.fullName,
-          email: member.email,
-          phone: member.phone,
-          college: member.college,
-          standard: member.standard,
-          stream: member.stream,
-          registrationDate: new Date().toISOString(),
+          eventTitle,
+          fullName: member.fullName || '',
+          email: member.email || '',
+          phone: member.phone || '',
+          college: member.college || '',
+          standard: member.standard || '',
+          stream: member.stream || '',
+          registrationDate: timestamp,
           qrCode: uniqueQRCode,
+          qrUpdatedAt: timestamp,
           isVerified: false,
           teamId,
           teamName,
-          isTeamLead: i === 0, // First member is team lead
+          isTeamLead: i === 0,
           paymentStatus: 'pending' as const,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          paymentMethod: null,
+          entryFeePaid: (member as any).entryFeePaid ?? (i === 0 ? event.entryFee : 0),
+          registrationType: (member as any).registrationType ?? 'regular',
+          paymentTimestamp: null,
+          verificationTime: null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
         };
-        if ((member as any).registrationType !== undefined) participantDoc.registrationType = (member as any).registrationType;
-        if ((member as any).entryFeePaid !== undefined) participantDoc.entryFeePaid = (member as any).entryFeePaid;
-        if ((member as any).assignedRoom !== undefined) participantDoc.assignedRoom = (member as any).assignedRoom;
 
+        // Optional data from member
+        if ((member as any).assignedRoom) participantDoc.assignedRoom = (member as any).assignedRoom;
+        if ((member as any).receiptUrl) participantDoc.receiptUrl = (member as any).receiptUrl;
+
+        // Save to Firestore
         const docRef = await addDoc(collection(db, 'participants'), participantDoc);
 
         const participant: Participant = {
           id: docRef.id,
-          eventId: participantDoc.eventId,
-          fullName: participantDoc.fullName,
-          email: participantDoc.email,
-          phone: participantDoc.phone,
-          college: participantDoc.college,
-          standard: participantDoc.standard,
-          stream: participantDoc.stream,
-          registrationDate: participantDoc.registrationDate,
-          qrCode: participantDoc.qrCode,
-          isVerified: participantDoc.isVerified,
-          paymentStatus: participantDoc.paymentStatus,
-          paymentMethod: participantDoc.paymentMethod,
-          receiptUrl: participantDoc.receiptUrl,
-          verificationTime: participantDoc.verificationTime,
-          teamId: participantDoc.teamId,
-          teamName: participantDoc.teamName,
-          isTeamLead: participantDoc.isTeamLead,
-          ...(participantDoc.registrationType ? { registrationType: participantDoc.registrationType } : {}),
-          ...(participantDoc.entryFeePaid ? { entryFeePaid: participantDoc.entryFeePaid } : {}),
-          ...(participantDoc.assignedRoom ? { assignedRoom: participantDoc.assignedRoom } : {})
+          ...participantDoc,
         };
 
         registeredMembers.push(participant);
       }
 
-      // Update event participant count
+      // 🔹 Update event participant count
       await this.updateEvent(eventId, {
-        currentParticipants: event.currentParticipants + teamMembers.length
+        currentParticipants: (event.currentParticipants || 0) + teamMembers.length,
+        updatedAt: new Date().toISOString(),
       });
 
+      console.log(`✅ Registered team "${teamName}" (${teamMembers.length} members) for event "${eventTitle}"`);
       return registeredMembers;
     } catch (error) {
       console.error('Error registering team in Firebase:', error);
       throw new Error('Failed to register team');
+    }
+  }
+
+  async updateTeamMembers(teamId: string, members: Participant[]): Promise<void> {
+    try {
+      const timestamp = new Date().toISOString();
+
+      // 1️⃣ Get all current team members
+      const q = query(collection(db, 'participants'), where('teamId', '==', teamId));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        console.warn(`⚠️ No existing team found for teamId: ${teamId}.`);
+        return;
+      }
+
+      // 2️⃣ Grab existing metadata (eventId, teamName, etc.)
+      const existingLead = snapshot.docs.find((doc) => doc.data().isTeamLead)?.data() || snapshot.docs[0].data();
+      const { eventId, teamName } = existingLead;
+
+      // 3️⃣ Delete extra participants if new member count < old
+      const existingIds = snapshot.docs.map((docSnap) => docSnap.id);
+      if (members.length < existingIds.length) {
+        const toRemove = existingIds.slice(members.length);
+        for (const id of toRemove) {
+          await updateDoc(doc(db, 'participants', id), { deleted: true }); // soft delete
+        }
+      }
+
+      // 4️⃣ Update existing or add new members
+      for (let i = 0; i < members.length; i++) {
+        const m = members[i];
+        const memberId = existingIds[i];
+        const uniqueQRCode = QRCodeService.generateUniqueQRCode();
+
+        const participantDoc: any = {
+          eventId: eventId || m.eventId || null,
+          teamId,
+          teamName: teamName || m.teamName || '',
+          fullName: m.fullName || '',
+          email: m.email || '',
+          phone: m.phone || '',
+          college: m.college || '',
+          standard: m.standard || '',
+          stream: m.stream || '',
+          isTeamLead: i === 0,
+          registrationDate: m.registrationDate || timestamp,
+          qrCode: m.qrCode || uniqueQRCode,
+          qrUpdatedAt: timestamp,
+          paymentStatus: m.paymentStatus || 'pending',
+          entryFeePaid: m.entryFeePaid ?? (i === 0 ? existingLead.entryFeePaid || 0 : 0),
+          registrationType: m.registrationType || existingLead.registrationType || 'regular',
+          paymentMethod: m.paymentMethod || null,
+          receiptUrl: m.receiptUrl || null,
+          verificationTime: m.verificationTime || null,
+          isVerified: m.isVerified ?? false,
+          updatedAt: timestamp,
+        };
+
+        if (memberId) {
+          // 🔹 Update existing document
+          await updateDoc(doc(db, 'participants', memberId), participantDoc);
+        } else {
+          // 🔹 Add new member if more added than before
+          await addDoc(collection(db, 'participants'), participantDoc);
+        }
+      }
+
+      console.log(`✅ Team "${teamName}" updated successfully with ${members.length} members.`);
+    } catch (error) {
+      console.error('❌ Error updating team members:', error);
+      throw new Error('Failed to update team members');
+    }
+  }
+
+  async deleteParticipant(participantId: string): Promise<void> {
+    // Directly access the document
+    const participantRef = doc(db, "participants", participantId);
+    const snapshot = await getDocs(query(collection(db, "participants"), where("__name__", "==", participantId)));
+
+    let participantData: any = null;
+    if (!snapshot.empty) {
+      participantData = snapshot.docs[0].data();
+    }
+
+    // If still not found, fallback to team deletion check by manually scanning all participants
+    if (!participantData) {
+      console.warn(`⚠️ Participant document not found for ID: ${participantId}. Skipping team lookup.`);
+      await deleteDoc(participantRef); // still delete doc by ID
+      return;
+    }
+
+    // ✅ Team deletion logic
+    if (participantData.teamId) {
+      const teamQuery = query(collection(db, "participants"), where("teamId", "==", participantData.teamId));
+      const teamSnapshot = await getDocs(teamQuery);
+
+      const deletions = teamSnapshot.docs.map((docSnap) =>
+        deleteDoc(doc(db, "participants", docSnap.id))
+      );
+      await Promise.all(deletions);
+
+      console.log(`✅ Deleted team "${participantData.teamName}" (${teamSnapshot.docs.length} members)`);
+    } else {
+      await deleteDoc(participantRef);
+      console.log(`✅ Deleted individual participant "${participantData.fullName || participantId}"`);
     }
   }
 

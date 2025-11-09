@@ -111,9 +111,9 @@ const TeamRegistrationForm: React.FC<TeamRegistrationFormProps> = ({ event, onSu
         email: index === 0 ? (user?.email || '') : member.email // Team lead uses authenticated user's email
       }));
 
-      const participants = await dataService.registerTeam(event.id, teamName, teamMembersWithEmail);
+      // const participants = await dataService.registerTeam(event.id, teamName, teamMembersWithEmail);
       toast.success(`Team "${teamName}" registered successfully!`);
-      onSuccess(participants);
+      // onSuccess(participants);
     } catch (error) {
       console.error('Registration error:', error);
       toast.error(error instanceof Error ? error.message : 'Registration failed');

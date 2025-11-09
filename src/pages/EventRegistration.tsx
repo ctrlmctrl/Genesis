@@ -11,6 +11,8 @@ import GoogleLogin from '../components/GoogleLogin';
 import PaymentModal from '../components/PaymentModal';
 import { canUserRegister, getRegistrationCountdown, isRegistrationOpen, isOnSpotRegistrationAvailable, getEntryFee, getPaymentMethod, getRegistrationType } from '../services/registrationService';
 import { paymentService } from '../services/paymentService';
+import type { Participant } from '../types';
+import { is } from 'date-fns/locale';
 
 interface RegistrationForm {
   fullName: string;
@@ -49,14 +51,16 @@ const EventRegistration: React.FC = () => {
   const [showTeamForm, setShowTeamForm] = useState(false);
   // Team registration state (inlined)
   const [teamName, setTeamName] = useState('');
-  const [teamMembers, setTeamMembers] = useState<any[]>(() => [{
-    fullName: '',
-    email: user?.email || '',
-    phone: '',
-    college: '',
-    standard: 'FY',
-    stream: ''
-  }]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([
+    {
+      fullName: '',
+      email: user?.email || '',
+      phone: '',
+      college: '',
+      standard: '',
+      stream: '',
+    },
+  ]);
   const [teamLoading, setTeamLoading] = useState(false);
 
   const {
@@ -76,6 +80,7 @@ const EventRegistration: React.FC = () => {
           navigate('/');
           return;
         }
+
         setEvent(eventData);
 
         // Check registration status
@@ -85,10 +90,40 @@ const EventRegistration: React.FC = () => {
         // Determine registration type
         const regType = getRegistrationType(eventData);
         setRegistrationType(regType);
+
         // If this is a team event, show team registration form by default
         if (eventData.isTeamEvent) {
           setShowTeamForm(true);
         }
+
+        // 🧩 Automatically set team members when event loads
+        if (eventData.isTeamEvent) {
+          const max = eventData.membersPerTeam || 1;
+
+          setTeamMembers(prev => {
+            const baseMember = { fullName: '', email: '', phone: '', college: '', standard: '', stream: '' };
+
+            // ensure at least 1 (team lead)
+            let members = prev.length ? [...prev] : [{ ...baseMember }];
+
+            // expand or shrink based on membersPerTeam
+            if (members.length < max) {
+              const toAdd = max - members.length;
+              members = [
+                ...members,
+                ...Array(toAdd).fill(null).map(() => ({ ...baseMember })),
+              ];
+            } else if (members.length > max) {
+              members = members.slice(0, max);
+            }
+
+            // set logged-in user as team lead email
+            members[0].email = user?.email || '';
+
+            return members;
+          });
+        }
+
       } catch (error) {
         console.error('Error loading event:', error);
         toast.error('Failed to load event details');
@@ -99,6 +134,14 @@ const EventRegistration: React.FC = () => {
 
     loadEvent();
   }, [eventId, navigate, user?.email]);
+
+  useEffect(() => {
+    setTeamMembers(prev => {
+      const copy = [...prev];
+      if (copy[0]) copy[0].email = user?.email || '';
+      return copy;
+    });
+  }, [user?.email]);
 
   const onSubmit = async (data: RegistrationForm) => {
     if (!event || !isAuthenticated) return;
@@ -119,30 +162,39 @@ const EventRegistration: React.FC = () => {
 
     setSubmitting(true);
     try {
-      // Get the appropriate entry fee for the registration type
+      // Get entry fee (based on type)
       const entryFee = price;
-      // Check if user already registered for this event
+
+      // 🧩 Check if user already registered for this event
       const existingParticipant = await dataService.getParticipantByEventAndEmail(event.id, user?.email || '');
 
       if (existingParticipant) {
-        toast('You already registered for this event. Complete your payment to continue.', { icon: '⚠️' });
-        setParticipantId(existingParticipant.id);
-        setShowPaymentModal(true);
+        // Case 1: Payment pending, failed, or under verification
+        if (['pending', 'failed'].includes(existingParticipant.paymentStatus)) {
+          toast('You already registered. Please complete your payment.', { icon: '⚠️' });
+          setParticipantId(existingParticipant.id);
+          setShowPaymentModal(true);
+          setSubmitting(false);
+          return;
+        }
+
+        // Case 2: Already paid
+        toast('You already registered and paid for this event.', { icon: '⚠️' });
         setSubmitting(false);
         return;
       }
 
+      // 🧾 Fresh registration
       const participant = await dataService.registerParticipant({
         eventId: event.id,
         ...data,
-        email: user?.email || '', // Get email from authenticated user
-        registrationType: registrationType,
+        email: user?.email || '', // logged in user email
+        registrationType,
         entryFeePaid: entryFee,
       });
 
       setParticipantId(participant.id);
 
-      // If event has entry fee, show payment modal
       if (event.entryFee > 0) {
         setShowPaymentModal(true);
       } else {
@@ -164,56 +216,124 @@ const EventRegistration: React.FC = () => {
     setTeamMembers(copy);
   };
 
-  const addTeamMember = () => {
-    const max = event?.membersPerTeam || 1;
-    if (teamMembers.length < max) {
-      setTeamMembers([...teamMembers, { fullName: '', email: '', phone: '', college: '', standard: 'FY', stream: '' }]);
-    }
-  };
+  // const addTeamMember = () => {
+  //   const max = event?.membersPerTeam || 1;
+  //   if (teamMembers.length < max) {
+  //     setTeamMembers([...teamMembers, { fullName: '', email: '', phone: '', college: '', standard: 'FY', stream: '' }]);
+  //   }
+  // };
 
-  const removeTeamMember = (index: number) => {
-    if (index === 0) return;
-    setTeamMembers(teamMembers.filter((_, i) => i !== index));
-  };
+  // const removeTeamMember = (index: number) => {
+  //   if (index === 0) return;
+  //   setTeamMembers(teamMembers.filter((_, i) => i !== index));
+  // };
+
+  type TeamMemberInput = Omit<
+    Participant,
+    'id' | 'eventId' | 'qrCode' | 'registrationDate' | 'isVerified' | 'paymentStatus'
+  >;
 
   const submitTeam = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!event) return;
-    if (!teamName.trim()) { toast.error('Please enter a team name'); return; }
+    if (!teamName.trim()) {
+      toast.error('Please enter a team name');
+      return;
+    }
+
+    // 🔹 Basic validations (same as you had)
     const namePattern = /^[A-Z][a-zA-Z\s]*$/;
     const phonePattern = /^[6-9]\d{9}$/;
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    // basic validation
+
     for (let i = 0; i < teamMembers.length; i++) {
       const m = teamMembers[i];
-      if (!m.fullName || !m.phone || !m.college || !m.standard || !m.stream) {
-        toast.error(`Please fill all details for team member ${i + 1}`); return;
-      }
-      if (!namePattern.test(m.fullName)) {
-        toast.error(`Member ${i + 1}: Name must start with a capital letter`);
-        return;
-      }
 
-      if (!phonePattern.test(m.phone)) {
-        toast.error(`Member ${i + 1}: Phone number must be 10 digits starting with 6, 7, 8, or 9`);
+      const cleaned = Object.fromEntries(
+        Object.entries(m).map(([k, v]) => [
+          k,
+          typeof v === 'string' ? v.trim() : (v ?? '')
+        ])
+      ) as Record<string, string>;
+
+      const hasAnyField = Object.values(cleaned).some(v => v !== '');
+      const allFieldsFilled =
+        cleaned.fullName &&
+        cleaned.phone &&
+        cleaned.college &&
+        cleaned.standard &&
+        cleaned.stream;
+
+      if (i === 0) {
+        if (!allFieldsFilled) {
+          toast.error('Please fill all details for the Team Lead');
+          return;
+        }
+        if (!namePattern.test(cleaned.fullName)) {
+          toast.error(`Team Lead: Name must start with a capital letter`);
+          return;
+        }
+        if (!phonePattern.test(cleaned.phone)) {
+          toast.error(`Team Lead: Phone number must be 10 digits starting with 6-9`);
+          return;
+        }
+        if (!emailPattern.test(user?.email || '')) {
+          toast.error(`Team Lead: Invalid email`);
+          return;
+        }
+      } else if (hasAnyField && !allFieldsFilled) {
+        toast.error(`Member ${i + 1}: Please complete all fields or leave blank`);
         return;
-      }
-      if (i !== 0 && !emailPattern.test(m.email)) {
-        toast.error(`Member ${i + 1}: Please enter a valid email`);
-        return;
+      } else if (hasAnyField) {
+        if (!namePattern.test(cleaned.fullName)) {
+          toast.error(`Member ${i + 1}: Name must start with a capital letter`);
+          return;
+        }
+        if (!phonePattern.test(cleaned.phone)) {
+          toast.error(`Member ${i + 1}: Phone number must be 10 digits starting with 6-9`);
+          return;
+        }
+        if (!emailPattern.test(cleaned.email)) {
+          toast.error(`Member ${i + 1}: Invalid email format`);
+          return;
+        }
       }
     }
 
     setTeamLoading(true);
     try {
-      const payload = teamMembers.map((m, idx) => ({
+      const filledMembers = teamMembers.filter((m, idx) => {
+        const hasAnyField = Object.values(m).some(v => typeof v === 'string' && v.trim() !== '');
+        return idx === 0 || hasAnyField; // always include lead
+      });
+
+      const payload: TeamMemberInput[] = filledMembers.map((m, idx) => ({
         ...m,
         email: idx === 0 ? (user?.email || '') : m.email,
-        entryFeePaid: idx === 0 ? event.entryFee : 0
+        entryFeePaid: idx === 0 ? event.entryFee : 0,
+        isTeamLead: idx === 0
       }));
 
-      const participants = await dataService.registerTeam(event.id, teamName, payload);
-      // set participantId to team lead so payment modal can use it
+      // 🔹 Check if team lead already registered
+      const existingParticipant = await dataService.getParticipantByEventAndEmail(event.id, user?.email || '');
+      if (existingParticipant) {
+        if (['pending', 'failed'].includes(existingParticipant.paymentStatus)) {
+          if (existingParticipant.teamId) {
+            await dataService.updateTeamMembers(existingParticipant.teamId, payload as Participant[]);
+            toast.success('Team details updated! Please complete your payment.');
+          }
+          setParticipantId(existingParticipant.id);
+          setShowPaymentModal(true);
+          setTeamLoading(false);
+          return;
+        }
+        toast('You already registered and paid for this event.', { icon: '⚠️' });
+        setTeamLoading(false);
+        return;
+      }
+
+      // 🧾 Fresh team registration
+      const participants = await dataService.registerTeam(event.id, teamName, payload as Participant[]);
       setParticipantId(participants[0]?.id || '');
       setShowPaymentModal(event.entryFee > 0);
       toast.success('Team registered — complete payment to finish registration');
@@ -224,7 +344,6 @@ const EventRegistration: React.FC = () => {
       setTeamLoading(false);
     }
   };
-
 
   const handlePaymentComplete = async (method: 'online' | 'offline', receiptUrl?: string) => {
     try {
@@ -432,36 +551,78 @@ const EventRegistration: React.FC = () => {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="font-medium text-white">Team Members</h4>
-                {(teamMembers.length < (event.membersPerTeam || 1)) && (
+                {/* {(teamMembers.length < (event.membersPerTeam || 1)) && (
                   <button type="button" onClick={addTeamMember} className="btn-secondary">Add Member</button>
-                )}
+                )} */}
               </div>
 
               <div className="space-y-4">
                 {teamMembers.map((member, idx) => (
-                  <div key={idx} className="bg-gray-800 p-4 rounded-lg">
+                  <div
+                    key={idx}
+                    className={`bg-gray-800 p-4 rounded-lg transition ${!member.fullName && idx !== 0 ? 'opacity-60' : 'opacity-100'
+                      }`}
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center">
                         <Users className="h-5 w-5 text-cyan-400 mr-2" />
-                        <div className="text-white font-medium">Member {idx + 1}{idx === 0 ? ' (Team Lead)' : ''}</div>
+                        <div className="text-white font-medium">
+                          Member {idx + 1}{idx === 0 ? ' (Team Lead)' : ''}
+                        </div>
                       </div>
-                      {idx !== 0 && (<button type="button" onClick={() => removeTeamMember(idx)} className="text-red-400">Remove</button>)}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <input required className="input-field" placeholder="Full name" value={member.fullName} onChange={(e) => handleTeamMemberChange(idx, 'fullName', e.target.value)} />
-                      <input required className="input-field" placeholder="Email" value={member.email} onChange={(e) => handleTeamMemberChange(idx, 'email', e.target.value)} disabled={idx === 0} />
-                      <input required className="input-field" placeholder="Phone" value={member.phone} onChange={(e) => handleTeamMemberChange(idx, 'phone', e.target.value)} />
-                      <input required className="input-field" placeholder="College" value={member.college} onChange={(e) => handleTeamMemberChange(idx, 'college', e.target.value)} />
-                      <select required className="input-field" value={member.standard} onChange={(e) => handleTeamMemberChange(idx, 'standard', e.target.value)}>
+                      <input
+                        className="input-field"
+                        placeholder="Full name"
+                        value={member.fullName}
+                        onChange={(e) => handleTeamMemberChange(idx, 'fullName', e.target.value)}
+                        required={idx === 0}
+                      />
+                      <input
+                        className="input-field"
+                        placeholder="Email"
+                        value={member.email}
+                        onChange={(e) => handleTeamMemberChange(idx, 'email', e.target.value)}
+                        disabled={idx === 0}
+                      />
+                      <input
+                        className="input-field"
+                        placeholder="Phone"
+                        value={member.phone}
+                        onChange={(e) => handleTeamMemberChange(idx, 'phone', e.target.value)}
+                        required={idx === 0}
+                      />
+                      <input
+                        className="input-field"
+                        placeholder="College"
+                        value={member.college}
+                        onChange={(e) => handleTeamMemberChange(idx, 'college', e.target.value)}
+                        required={idx === 0}
+                      />
+                      <select
+                        required={idx === 0}
+                        className="input-field"
+                        value={member.standard}
+                        onChange={(e) => handleTeamMemberChange(idx, 'standard', e.target.value)}
+                      >
+                        <option value="">Select Year/Standard</option>
                         <option value="FY">FY</option>
                         <option value="SY">SY</option>
                         <option value="TY">TY</option>
-                        <option value="TY">Fourth Year</option>
+                        <option value="Fourth Year">Fourth Year</option>
                         <option value="11">11</option>
                         <option value="12">12</option>
                       </select>
-                      <input required className="input-field md:col-span-2" placeholder="Degree/Stream" value={member.stream} onChange={(e) => handleTeamMemberChange(idx, 'stream', e.target.value)} />
+
+                      <input
+                        className="input-field md:col-span-2"
+                        placeholder="Degree/Stream"
+                        value={member.stream}
+                        onChange={(e) => handleTeamMemberChange(idx, 'stream', e.target.value)}
+                        required={idx === 0}
+                      />
                     </div>
                   </div>
                 ))}

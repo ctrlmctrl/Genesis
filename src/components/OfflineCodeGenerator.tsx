@@ -4,6 +4,8 @@ import { Copy, QrCode, Clock, CheckCircle, X, Plus, Eye, EyeOff } from 'lucide-r
 import { offlineCodeService, OfflinePaymentCode } from '../services/offlineCodeService';
 import { Event } from '../types';
 import toast from 'react-hot-toast';
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "../firebase";
 
 interface OfflineCodeGeneratorProps {
   isOpen: boolean;
@@ -25,28 +27,48 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
   const [filter, setFilter] = useState<'all' | 'unused' | 'used'>('unused');
 
   useEffect(() => {
-    if (isOpen) {
-      loadCodes();
+    if (!isOpen) return;
 
-      // 🔹 Function to dynamically set correct price
-      const updateAmount = () => {
-        if (!event) return;
+    // 🔹 Determine correct price on open
+    const updateAmount = () => {
+      if (!event) return;
 
-        const newAmount = isWithinOnSpotWindow(event)
-          ? event.onSpotEntryFee ?? event.entryFee ?? 0
-          : event.entryFee ?? 0;
+      const newAmount = isWithinOnSpotWindow(event)
+        ? event.onSpotEntryFee ?? event.entryFee ?? 0
+        : event.entryFee ?? 0;
 
-        setAmount(newAmount);
-      };
+      setAmount(newAmount);
+    };
+    updateAmount();
+    const interval = setInterval(updateAmount, 60000);
 
-      // Run immediately
-      updateAmount();
+    // 🔹 Firestore live listener for this event's offline codes
+    const q = query(collection(db, "offlineCodes"), where("eventId", "==", event.id));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const codeList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as OfflinePaymentCode[];
+      setCodes(codeList);
 
-      // Recheck every 60 seconds while modal is open
-      const interval = setInterval(updateAmount, 60000);
+      // ✅ Recalculate stats live
+      const now = new Date();
+      const used = codeList.filter((c) => c.isUsed).length;
+      const expired = codeList.filter((c) => !c.isUsed && new Date(c.expiresAt) <= now).length;
+      const unused = codeList.filter((c) => !c.isUsed && new Date(c.expiresAt) > now).length;
 
-      return () => clearInterval(interval);
-    }
+      setStats({
+        total: codeList.length,
+        used,
+        unused,
+        expired,
+      });
+    });
+
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
   }, [isOpen, event]);
 
   const loadCodes = async () => {
@@ -113,20 +135,6 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
 
   // State for code stats
   const [stats, setStats] = useState<{ total: number; used: number; unused: number; expired: number } | null>(null);
-
-  // Fetch stats on mount
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const result = await offlineCodeService.getCodeStats();
-        setStats(result);
-      } catch (error) {
-        console.error('Error fetching code stats:', error);
-      }
-    };
-
-    fetchStats();
-  }, []);
 
   if (!isOpen) return null;
 

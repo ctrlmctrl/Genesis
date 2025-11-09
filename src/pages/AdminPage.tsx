@@ -306,12 +306,15 @@ const AdminPage: React.FC = () => {
   };
 
   const handleExportAll = async () => {
+    const loadingToast = toast.loading("Generating event summary...");
     try {
-      await excelService.exportEventSummary(events);
-      toast.success('Events exported successfully!');
+      await excelService.exportEventSummary(events, participants);
+      toast.success("Event summary exported successfully!");
     } catch (error) {
-      console.error('Export error:', error);
-      toast.error('Failed to export events');
+      console.error("Export error:", error);
+      toast.error("Failed to export event summary");
+    } finally {
+      toast.dismiss(loadingToast);
     }
   };
 
@@ -489,16 +492,16 @@ const AdminPage: React.FC = () => {
       p.eventId.toString() === event.id.toString() &&
       (p.paymentStatus === "paid" || p.paymentStatus === "offline_paid") // check both paid statuses
     );
-    console.log("eventParticipants:", eventParticipants);
+    // console.log("eventParticipants:", eventParticipants);
 
     const individualRevenue = eventParticipants
       .filter(p => !p.teamId) // individual participants
       .reduce((acc, p) => acc + (p.entryFeePaid || 0), 0);
-    console.log("Individual Revenue:", individualRevenue);
+    // console.log("Individual Revenue:", individualRevenue);
     const teamRevenue = eventParticipants
       .filter(p => p.teamId && p.isTeamLead) // only team leads
       .reduce((acc, p) => acc + (p.entryFeePaid || 0), 0);
-    console.log("Team Revenue:", teamRevenue);
+    // console.log("Team Revenue:", teamRevenue);
     return sum + individualRevenue + teamRevenue;
   }, 0);
 
@@ -548,7 +551,7 @@ const AdminPage: React.FC = () => {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
-              <span className="ml-4 text-gray-400">Welcome, {adminUser?.username || 'Admin'}</span>
+              <span className="ml-4 text-gray-400">Welcome, {'Admin'}</span>
             </div>
             <div className="flex items-center space-x-4">
               <Link
