@@ -785,6 +785,17 @@ class DataService {
     return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Participant;
   }
 
+  async getTeamLeadByTeamId(teamId: string): Promise<Participant | null> {
+    const q = query(
+      collection(db, "participants"),
+      where("teamId", "==", teamId),
+      where("isTeamLead", "==", true)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...snap.docs[0].data() } as Participant;
+  }
+
   async updateParticipantInfo(participantId: string, info: ParticipantInfo): Promise<Participant | null> {
     const participantIndex = this.participants.findIndex(p => p.id === participantId);
     if (participantIndex === -1) return null;

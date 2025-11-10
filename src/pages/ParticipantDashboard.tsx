@@ -16,6 +16,10 @@ const ParticipantDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  // Derived lists for clarity
+  const teamLeadsOrSolo = participants.filter(p => !p.teamId || p.isTeamLead);
+  const teamMembers = participants.filter(p => p.teamId && !p.isTeamLead);
+  const [teamLeadNames, setTeamLeadNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [showReceiptReupload, setShowReceiptReupload] = useState(false);
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
@@ -78,6 +82,36 @@ const ParticipantDashboard: React.FC = () => {
       toast.error('Failed to load data');
     }
   };
+
+  useEffect(() => {
+    if (participants.length === 0) return;
+
+    const uniqueTeamIds = Array.from(
+      new Set(participants.map(p => p.teamId).filter(Boolean))
+    ) as string[];
+
+    // 🧠 Skip if no new team IDs appear
+    const alreadyFetched = Object.keys(teamLeadNames);
+    const newIds = uniqueTeamIds.filter(id => !alreadyFetched.includes(id));
+    if (newIds.length === 0) return;
+
+    const fetchTeamLeads = async () => {
+      const newLeads: Record<string, string> = { ...teamLeadNames };
+
+      for (const teamId of newIds) {
+        try {
+          const leadDoc = await dataService.getTeamLeadByTeamId(teamId);
+          newLeads[teamId] = leadDoc?.fullName ?? 'N/A';
+        } catch {
+          newLeads[teamId] = 'N/A';
+        }
+      }
+
+      setTeamLeadNames(newLeads);
+    };
+
+    fetchTeamLeads();
+  }, [participants]);
 
   const handleReceiptUploadSuccess = async (participantId: string, receiptUrl: string) => {
     // Refresh the participants data to show updated payment status
@@ -160,9 +194,8 @@ const ParticipantDashboard: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {participants.map((participant) => {
+            {teamLeadsOrSolo.map((participant) => {
               const event = events.find(e => e.id === participant.eventId);
-
               return (
                 <motion.div
                   key={participant.id}
@@ -283,6 +316,51 @@ const ParticipantDashboard: React.FC = () => {
           </div>
         )}
       </div>
+      {/* 🧩 I'm a Team Member Section */}
+      {teamMembers.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-white mb-4 neon-text">I'm a Team Member</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {teamMembers.map((member) => {
+              const event = events.find(e => e.id === member.eventId);
+              const teamLead = participants.find(
+                p => p.teamId === member.teamId && p.isTeamLead
+              );
+              return (
+                <motion.div
+                  key={member.id}
+                  className="card-glow border-cyan-500/30 hover:shadow-cyan-400/30 transition-shadow"
+                  whileHover={{ y: -2 }}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">
+                        {event ? event.title : `Event ID: ${member.eventId}`}
+                      </h3>
+                      {member.teamId && (
+                        <div className="mt-1">
+                          <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full mr-2">
+                            Team: {member.teamName || '—'}
+                          </span>
+                          <span className="px-2 py-1 bg-gray-700/30 text-gray-300 text-xs rounded-full">
+                            Team Lead: {teamLeadNames[member.teamId] || 'N/A'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <span className="px-2 py-1 rounded-full text-xs bg-cyan-500/20 text-cyan-400">
+                      Member
+                    </span>
+                  </div>
+                  <div className="mt-3 bg-gray-800/40 border border-gray-700 text-gray-400 text-center rounded-lg py-2 text-sm">
+                    Registered under your team lead
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Available Events section removed as per request */}
 

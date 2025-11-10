@@ -26,50 +26,56 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
   const [showAllCodes, setShowAllCodes] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unused' | 'used'>('unused');
 
+  // 🧩 Helper: Determine if on-the-spot registration is active
+  const isWithinOnSpotWindow = (event: Event): boolean => {
+    if (!event.allowOnSpotRegistration) return false;
+    if (!event.date || !event.onSpotStartTime || !event.onSpotEndTime) return false;
+
+    const now = new Date();
+    const start = new Date(`${event.date}T${event.onSpotStartTime}`);
+    const end = new Date(`${event.date}T${event.onSpotEndTime}`);
+    return now >= start && now <= end;
+  };
+
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !event) return;
 
-    // 🔹 Determine correct price on open
+    // ✅ Update fee logic
     const updateAmount = () => {
-      if (!event) return;
-
       const newAmount = isWithinOnSpotWindow(event)
         ? event.onSpotEntryFee ?? event.entryFee ?? 0
         : event.entryFee ?? 0;
-
       setAmount(newAmount);
     };
+
     updateAmount();
     const interval = setInterval(updateAmount, 60000);
 
-    // 🔹 Firestore live listener for this event's offline codes
-    const q = query(collection(db, "offlineCodes"), where("eventId", "==", event.id));
+    // ✅ Setup Firestore listener
+    const q = query(collection(db, "offline_payment_codes"), where("eventId", "==", event.id));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const codeList = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as OfflinePaymentCode[];
+
       setCodes(codeList);
 
-      // ✅ Recalculate stats live
+      // ✅ Compute stats safely
       const now = new Date();
       const used = codeList.filter((c) => c.isUsed).length;
       const expired = codeList.filter((c) => !c.isUsed && new Date(c.expiresAt) <= now).length;
       const unused = codeList.filter((c) => !c.isUsed && new Date(c.expiresAt) > now).length;
 
-      setStats({
-        total: codeList.length,
-        used,
-        unused,
-        expired,
-      });
+      setStats({ total: codeList.length, used, unused, expired });
     });
 
+    // 🧹 Cleanup to prevent multiple intervals or listeners
     return () => {
       clearInterval(interval);
       unsubscribe();
     };
-  }, [isOpen, event]);
+  }, [isOpen, event?.id]);
 
   const loadCodes = async () => {
     const eventCodes = await offlineCodeService.getCodesByEvent(event.id);
@@ -137,17 +143,6 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
   const [stats, setStats] = useState<{ total: number; used: number; unused: number; expired: number } | null>(null);
 
   if (!isOpen) return null;
-
-  // Helper: Determine if on-the-spot registration is active
-  const isWithinOnSpotWindow = (event: Event): boolean => {
-    if (!event.allowOnSpotRegistration) return false;
-    if (!event.date || !event.onSpotStartTime || !event.onSpotEndTime) return false;
-
-    const now = new Date();
-    const start = new Date(`${event.date}T${event.onSpotStartTime}`);
-    const end = new Date(`${event.date}T${event.onSpotEndTime}`);
-    return now >= start && now <= end;
-  };
 
   return (
     <motion.div
