@@ -9,6 +9,7 @@ import OfflineCodeGenerator from '../components/OfflineCodeGenerator';
 import toast from 'react-hot-toast';
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
+import { offlineCodeService } from '../services/offlineCodeService';
 
 const PaymentTracking: React.FC = () => {
   const navigate = useNavigate();
@@ -32,6 +33,10 @@ const PaymentTracking: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showCodeGenerator, setShowCodeGenerator] = useState(false);
   const [selectedEventForCode, setSelectedEventForCode] = useState<Event | null>(null);
+  // Inline admin inputs for unified action
+  const [selectedPaymentAction, setSelectedPaymentAction] = useState<'online' | 'offline' | 'failed'>('online');
+  const [paymentActionInput, setPaymentActionInput] = useState(''); // transaction id or offline code
+  const [submitLoading, setSubmitLoading] = useState(false);
 
   useEffect(() => {
     const currentUser = roleAuthService.getCurrentUser();
@@ -124,17 +129,65 @@ const PaymentTracking: React.FC = () => {
 
   const handleMarkAsPaid = async (participant: Participant, status: 'paid' | 'offline_paid' | 'failed') => {
     try {
+      // 🔹 Ask for offline payment code if marking as offline_paid
+      if (status === 'offline_paid') {
+        const offlineCode = prompt('Enter the Offline Payment Code:');
+
+        if (!offlineCode) {
+          toast.error('Offline payment code is required!');
+          return;
+        }
+
+        const event = events.find(e => e.id === participant.eventId);
+        if (!event) {
+          toast.error('Event details not found for this participant.');
+          return;
+        }
+
+        // ✅ Validate the code before proceeding
+        const validation = await offlineCodeService.validateCode(
+          offlineCode.trim().toUpperCase(),
+          participant.eventId,
+          event.entryFee
+        );
+
+        if (!validation.isValid || !validation.codeData) {
+          toast.error(validation.error || 'Invalid or expired offline payment code.');
+          return;
+        }
+
+        // ✅ Mark code as used in Firestore and update participant
+        const success = await offlineCodeService.useCode(
+          offlineCode.trim().toUpperCase(),
+          participant.eventId,
+          event.entryFee,
+          participant.id
+        );
+
+        if (success) {
+          toast.success('Offline code validated and payment marked as offline paid!');
+          setVerificationParticipant(null);
+          setVerificationIdentifier('');
+          loadData();
+        } else {
+          toast.error('Failed to mark offline payment. Try again.');
+        }
+
+        return;
+      }
+
+      // 🟢 Handle normal online or failed updates
       const success = await dataService.updatePaymentStatus(
         participant.id,
         status,
-        status === 'paid' ? 'online' : status === 'offline_paid' ? 'offline' : undefined
+        status === 'paid' ? 'online' : undefined
       );
 
       if (success) {
         toast.success(`Payment marked as ${status.replace('_', ' ')}`);
         setVerificationParticipant(null);
         setVerificationIdentifier('');
-        loadData(); // Refresh the data
+        loadData();
       } else {
         toast.error('Failed to update payment status');
       }
@@ -429,91 +482,152 @@ const PaymentTracking: React.FC = () => {
             </div>
           </div>
 
+          {/* ---- Unified Admin Payment Action (dropdown + conditional input + submit) ---- */}
           {verificationParticipant && (
-            <div className="bg-gray-700 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-white mb-2">Participant Found</h3>
-              <div className="space-y-2 text-sm">
-                <p><strong className="text-gray-300">Name:</strong> <span className="text-white">{verificationParticipant.fullName}</span></p>
-                <p><strong className="text-gray-300">Email:</strong> <span className="text-white">{verificationParticipant.email}</span></p>
-                <p><strong className="text-gray-300">Phone:</strong> <span className="text-white">{verificationParticipant.phone}</span></p>
-                <p><strong className="text-gray-300">Current Status:</strong>
-                  <span className={`ml-2 px-2 py-1 rounded text-xs ${getStatusColor(verificationParticipant.paymentStatus)}`}>
-                    {verificationParticipant.paymentStatus.replace('_', ' ')}
-                  </span>
-                </p>
-                {verificationParticipant.entryFeePaid && (
-                  <p><strong className="text-gray-300">Amount:</strong> <span className="text-white">₹{verificationParticipant.entryFeePaid}</span></p>
-                )}
+            <div className="mt-4 bg-gray-800/50 p-4 rounded-lg border border-gray-700">
+              <h4 className="text-sm font-medium text-gray-300 mb-2">Admin Action</h4>
+
+              <div className="flex items-center gap-3 mb-3">
+                <select
+                  value={selectedPaymentAction}
+                  onChange={(e) => {
+                    const val = e.target.value as 'online' | 'offline' | 'failed';
+                    setSelectedPaymentAction(val);
+                    setPaymentActionInput(''); // clear input when switching
+                  }}
+                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="online">Online Payment (Transaction ID)</option>
+                  <option value="offline">Offline Payment (Payment Code)</option>
+                  <option value="failed">Mark as Failed</option>
+                </select>
+
+                <div className="text-sm text-gray-400">
+                  {selectedPaymentAction === 'online' && 'Enter transaction id and submit.'}
+                  {selectedPaymentAction === 'offline' && 'Enter offline code generated earlier.'}
+                  {selectedPaymentAction === 'failed' && 'This will mark the payment as failed.'}
+                </div>
               </div>
 
-              {(verificationParticipant.paymentStatus === 'under_verification') && (
-                <div className="mt-4 flex space-x-2">
-                  <button
-                    onClick={() => handleMarkAsPaid(verificationParticipant, 'paid')}
-                    className="btn-primary text-sm"
-                  >
-                    Mark as Online Paid
-                  </button>
-                  <button
-                    onClick={() => handleMarkAsPaid(verificationParticipant, 'offline_paid')}
-                    className="btn-secondary text-sm"
-                  >
-                    Mark as Offline Paid
-                  </button>
-                  <button
-                    onClick={() => handleMarkAsPaid(verificationParticipant, 'failed')}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
-                  >
-                    Mark as Failed
-                  </button>
-                </div>
-              )}
-              {/* Admin-only transaction ID entry and duplicate check */}
-              <div className="mt-4">
-                <label className="block text-sm text-gray-300 mb-2">Transaction ID (admin only)</label>
-                <div className="flex space-x-2">
+              {/* Conditional Input */}
+              {selectedPaymentAction !== 'failed' && (
+                <div className="mb-3">
                   <input
                     type="text"
-                    value={adminTransactionId}
-                    onChange={(e) => setAdminTransactionId(e.target.value)}
-                    placeholder="e.g., TXN123456789 or bank reference"
-                    className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400"
+                    value={paymentActionInput}
+                    onChange={(e) => setPaymentActionInput(e.target.value)}
+                    placeholder={selectedPaymentAction === 'online' ? 'Transaction ID (e.g., TXN12345)' : 'Offline Code (e.g., ABC123)'}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400"
                   />
-                  <button
-                    onClick={async () => {
-                      if (!verificationParticipant) return;
-                      if (!adminTransactionId.trim()) {
-                        toast.error('Enter a transaction ID first');
-                        return;
-                      }
+                </div>
+              )}
 
-                      // Check for duplicates
-                      const duplicate = participants.find(p => p.transactionId === adminTransactionId.trim() && p.id !== verificationParticipant.id);
-                      if (duplicate) {
-                        toast.error('Duplicate transaction ID found: another participant has the same transaction ID');
-                        return;
-                      }
+              <div className="flex items-center justify-end space-x-2">
+                <button
+                  onClick={async () => {
+                    if (!verificationParticipant) return;
+                    setSubmitLoading(true);
 
-                      try {
-                        const updated = await dataService.updatePaymentStatus(verificationParticipant.id, 'paid', 'online', verificationParticipant.receiptUrl, adminTransactionId.trim());
+                    try {
+                      // ONLINE: transaction id flow
+                      if (selectedPaymentAction === 'online') {
+                        const txId = paymentActionInput.trim();
+                        if (!txId) {
+                          toast.error('Please enter a transaction ID');
+                          setSubmitLoading(false);
+                          return;
+                        }
+
+                        // duplicate check
+                        const duplicate = participants.find(p => p.transactionId === txId && p.id !== verificationParticipant.id);
+                        if (duplicate) {
+                          toast.error('Duplicate transaction ID found for another participant.');
+                          setSubmitLoading(false);
+                          return;
+                        }
+
+                        const updated = await dataService.updatePaymentStatus(
+                          verificationParticipant.id,
+                          'paid',
+                          'online',
+                          verificationParticipant.receiptUrl,
+                          txId
+                        );
+
                         if (updated) {
-                          toast.success('Transaction ID saved and payment marked as paid');
-                          setVerificationParticipant(updated);
-                          setAdminTransactionId('');
+                          toast.success('Marked as Online Paid and saved transaction ID');
+                          setPaymentActionInput('');
                           loadData();
                         } else {
                           toast.error('Failed to update participant');
                         }
-                      } catch (err) {
-                        console.error('Error saving transaction ID:', err);
-                        toast.error('Failed to save transaction ID');
                       }
-                    }}
-                    className="btn-primary text-sm"
-                  >
-                    Save & Verify
-                  </button>
-                </div>
+
+                      // OFFLINE: offline code flow
+                      else if (selectedPaymentAction === 'offline') {
+                        const code = paymentActionInput.trim().toUpperCase();
+                        if (!code) {
+                          toast.error('Please enter an offline payment code');
+                          setSubmitLoading(false);
+                          return;
+                        }
+
+                        const event = events.find(e => e.id === verificationParticipant.eventId);
+                        if (!event) {
+                          toast.error('Event not found for this participant');
+                          setSubmitLoading(false);
+                          return;
+                        }
+
+                        // Validate code first
+                        const validation = await offlineCodeService.validateCode(code, verificationParticipant.eventId, event.entryFee);
+                        if (!validation.isValid) {
+                          toast.error(validation.error || 'Invalid or mismatched offline code');
+                          setSubmitLoading(false);
+                          return;
+                        }
+
+                        // Use the code (marks it used and updates participant)
+                        const success = await offlineCodeService.useCode(code, verificationParticipant.eventId, event.entryFee, verificationParticipant.id);
+
+                        if (success) {
+                          toast.success('Offline code validated — participant marked as Offline Paid');
+                          setPaymentActionInput('');
+                          loadData();
+                        } else {
+                          toast.error('Failed to use offline code');
+                        }
+                      }
+
+                      // FAILED: just mark failed
+                      else if (selectedPaymentAction === 'failed') {
+                        const updated = await dataService.updatePaymentStatus(
+                          verificationParticipant.id,
+                          'failed',
+                          undefined,
+                          undefined,
+                          undefined
+                        );
+
+                        if (updated) {
+                          toast.success('Marked as Failed');
+                          loadData();
+                        } else {
+                          toast.error('Failed to update participant');
+                        }
+                      }
+                    } catch (err) {
+                      console.error('Admin action error:', err);
+                      toast.error('An error occurred while processing');
+                    } finally {
+                      setSubmitLoading(false);
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-lg text-white ${submitLoading ? 'opacity-60 cursor-not-allowed bg-gray-600' : 'bg-cyan-600 hover:bg-cyan-700'}`}
+                  disabled={submitLoading}
+                >
+                  {submitLoading ? 'Processing...' : 'Submit'}
+                </button>
               </div>
             </div>
           )}

@@ -341,10 +341,9 @@ export class ExcelService {
 
   async exportEventSummary(events: Event[], allParticipants: Participant[]): Promise<void> {
     const workbook = new ExcelJS.Workbook();
-
-    // === 1️⃣ EVENT SUMMARY SHEET ===
     const summarySheet = workbook.addWorksheet('Event Summary');
 
+    // === 1️⃣ Summary Sheet Columns ===
     summarySheet.columns = [
       { header: 'S.No', key: 'sno', width: 6 },
       { header: 'Event Title', key: 'title', width: 30 },
@@ -352,10 +351,10 @@ export class ExcelService {
       { header: 'Time', key: 'time', width: 15 },
       { header: 'Room', key: 'room', width: 20 },
       { header: 'Entry Fee (Reg/On-Spot)', key: 'entryFee', width: 22 },
-      { header: 'Team Entries', key: 'teams', width: 15 },
-      { header: 'Participants', key: 'participants', width: 15 },
-      { header: 'Pre-Registrations', key: 'preReg', width: 18 },
-      { header: 'On-Spot Registrations', key: 'onSpot', width: 20 },
+      { header: 'Teams', key: 'teams', width: 15 },
+      { header: 'Paid Participants', key: 'participants', width: 18 },
+      { header: 'Paid Pre-Registrations', key: 'preReg', width: 20 },
+      { header: 'Paid On-Spot Registrations', key: 'onSpot', width: 24 },
       { header: 'Total Amount (₹)', key: 'totalAmount', width: 18 },
       { header: 'Payment Method', key: 'paymentMethod', width: 18 },
     ];
@@ -363,44 +362,68 @@ export class ExcelService {
     let grandTotalParticipants = 0;
     let grandTotalAmount = 0;
 
-    // Loop through all events
+    // === 2️⃣ Summary Sheet Calculations (Accurate Total Fees) ===
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
       const participantsForEvent = allParticipants.filter(p => p.eventId === event.id);
 
-      // Regular and on-spot participants
-      const preReg = participantsForEvent.filter(p => p.registrationType === 'regular').length;
-      const onSpot = participantsForEvent.filter(p => p.registrationType === 'on_spot').length;
+      // Only paid or offline paid participants
+      const paidParticipants = participantsForEvent.filter(
+        p => p.paymentStatus === 'paid' || p.paymentStatus === 'offline_paid'
+      );
 
       let teamCount = 0;
-      let participantCount = participantsForEvent.length;
+      let paidCount = 0;
+      let preReg = 0;
+      let onSpot = 0;
       let totalAmount = 0;
 
       if (event.isTeamEvent) {
-        // Team event: calculate teams and amounts separately
-        const teams = new Set(participantsForEvent.map(p => p.teamName).filter(Boolean));
-        teamCount = teams.size;
+        // === Team Event Fee Calculation ===
+        const teamGroups = paidParticipants.reduce((acc, p) => {
+          const teamName = p.teamName || 'No Team';
+          if (!acc[teamName]) acc[teamName] = [];
+          acc[teamName].push(p);
+          return acc;
+        }, {} as Record<string, Participant[]>);
 
-        const regularTeams = new Set(
-          participantsForEvent.filter(p => p.registrationType === 'regular' && p.isTeamLead)
-            .map(p => p.teamName)
-        ).size;
-        const onSpotTeams = new Set(
-          participantsForEvent.filter(p => p.registrationType === 'on_spot' && p.isTeamLead)
-            .map(p => p.teamName)
-        ).size;
+        Object.values(teamGroups).forEach(teamMembers => {
+          const lead = teamMembers.find(m => m.isTeamLead);
+          if (!lead || (lead.paymentStatus !== 'paid' && lead.paymentStatus !== 'offline_paid')) return;
 
-        totalAmount =
-          (regularTeams * (event.entryFee || 0)) +
-          (onSpotTeams * (event.onSpotEntryFee || event.entryFee || 0));
+          const teamSize = teamMembers.length;
+          const entryFee =
+            lead.registrationType === 'on_spot'
+              ? event.onSpotEntryFee || event.entryFee || 0
+              : event.entryFee || 0;
+
+          // Add to counts
+          teamCount++;
+          paidCount += teamSize;
+          if (lead.registrationType === 'on_spot') onSpot += teamSize;
+          else preReg += teamSize;
+
+          // Add the *actual fee paid for team* (once per team)
+          totalAmount += entryFee;
+        });
       } else {
-        // Individual event: per participant
-        totalAmount =
-          (preReg * (event.entryFee || 0)) +
-          (onSpot * (event.onSpotEntryFee || event.entryFee || 0));
+        // === Individual Event Fee Calculation ===
+        paidParticipants.forEach(p => {
+          const entryFee =
+            p.registrationType === 'on_spot'
+              ? event.onSpotEntryFee || event.entryFee || 0
+              : event.entryFee || 0;
+
+          paidCount++;
+          if (p.registrationType === 'on_spot') onSpot++;
+          else preReg++;
+
+          // Add *individual fee* per participant
+          totalAmount += entryFee;
+        });
       }
 
-      grandTotalParticipants += participantCount;
+      grandTotalParticipants += paidCount;
       grandTotalAmount += totalAmount;
 
       const entryFeeDisplay = event.onSpotEntryFee
@@ -414,8 +437,8 @@ export class ExcelService {
         time: event.time || '—',
         room: event.roomNo || 'Not Assigned',
         entryFee: entryFeeDisplay,
-        teams: teamCount || '—',
-        participants: participantCount,
+        teams: event.isTeamEvent ? teamCount : '—',
+        participants: paidCount,
         preReg,
         onSpot,
         totalAmount,
@@ -423,7 +446,7 @@ export class ExcelService {
       });
     }
 
-    // === GRAND TOTAL ROW ===
+    // Grand Total Row
     const totalRow = summarySheet.addRow({
       sno: '',
       title: 'Grand Total',
@@ -433,7 +456,7 @@ export class ExcelService {
     totalRow.font = { bold: true };
     totalRow.alignment = { horizontal: 'center' };
 
-    // === STYLE SUMMARY SHEET ===
+    // === 3️⃣ Style Summary Sheet ===
     const headerRow = summarySheet.getRow(1);
     headerRow.font = { bold: true, color: { argb: 'FF1F497D' } };
     headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -448,7 +471,6 @@ export class ExcelService {
           right: { style: 'thin', color: { argb: 'FFAAAAAA' } },
         };
       });
-
       if (rowNumber > 1 && rowNumber % 2 === 0 && rowNumber !== summarySheet.rowCount) {
         row.eachCell((cell) => {
           cell.fill = {
@@ -462,11 +484,40 @@ export class ExcelService {
 
     summarySheet.views = [{ state: 'frozen', ySplit: 1 }];
 
-    // === 2️⃣ EVENT-SPECIFIC SHEETS (same format as before) ===
+    // === 4️⃣ EVENT-SPECIFIC SHEETS (Paid-only entries) ===
+    // === 4️⃣ EVENT-SPECIFIC SHEETS (Paid-only entries with full team details) ===
+    // === 4️⃣ EVENT-SPECIFIC SHEETS (Paid-only entries with full team details) ===
+    // === 4️⃣ EVENT-SPECIFIC SHEETS (Paid-only entries with full team details, no team total) ===
     for (const event of events) {
-      const participants = allParticipants.filter(p => p.eventId === event.id);
-      const worksheet = workbook.addWorksheet(`${event.title.substring(0, 25)} Participants`);
+      let participants: Participant[] = [];
 
+      if (event.isTeamEvent) {
+        // Group all participants by team for this event
+        const eventParticipants = allParticipants.filter(p => p.eventId === event.id);
+        const teamGroups = eventParticipants.reduce((acc, participant) => {
+          const teamName = participant.teamName || 'No Team';
+          if (!acc[teamName]) acc[teamName] = [];
+          acc[teamName].push(participant);
+          return acc;
+        }, {} as Record<string, Participant[]>);
+
+        // Collect all members of teams whose lead is paid/offline_paid
+        Object.values(teamGroups).forEach(teamMembers => {
+          const lead = teamMembers.find(m => m.isTeamLead);
+          if (lead && (lead.paymentStatus === 'paid' || lead.paymentStatus === 'offline_paid')) {
+            participants.push(...teamMembers);
+          }
+        });
+      } else {
+        // For individual events → only include paid/offline_paid participants
+        participants = allParticipants.filter(
+          p =>
+            p.eventId === event.id &&
+            (p.paymentStatus === 'paid' || p.paymentStatus === 'offline_paid')
+        );
+      }
+
+      const worksheet = workbook.addWorksheet(`${event.title.substring(0, 25)} Paid`);
       worksheet.columns = [
         { header: 'Sr. No', key: 'srno', width: 8 },
         { header: 'Participant Name', key: 'name', width: 25 },
@@ -479,7 +530,9 @@ export class ExcelService {
       ];
 
       let srno = 1;
+
       if (event.isTeamEvent) {
+        // Regroup after filtering
         const teamGroups = participants.reduce((acc, participant) => {
           const teamName = participant.teamName || 'No Team';
           if (!acc[teamName]) acc[teamName] = [];
@@ -488,32 +541,41 @@ export class ExcelService {
         }, {} as Record<string, Participant[]>);
 
         Object.entries(teamGroups).forEach(([teamName, members]) => {
+          const lead = members.find(m => m.isTeamLead);
+          if (!lead) return;
+
+          // Sort so lead appears first
           members.sort((a, b) => (b.isTeamLead ? 1 : 0) - (a.isTeamLead ? 1 : 0));
-          const lead = members.find(m => m.isTeamLead) || members[0];
+
           const startRow = worksheet.rowCount + 1;
 
-          members.forEach((m, idx) => {
+          members.forEach((member, idx) => {
             worksheet.addRow({
               srno: idx === 0 ? srno : '',
-              name: m.fullName,
-              college: m.college,
-              phone: m.phone,
+              name: member.fullName,
+              college: member.college,
+              phone: member.phone,
               teamName: idx === 0 ? teamName : '',
-              registrationType: m.registrationType || 'regular',
-              paymentStatus: idx === 0 ? this.formatPaymentStatus(lead.paymentStatus) : '',
+              registrationType: member.registrationType || 'regular',
+              paymentStatus: idx === 0
+                ? (lead.paymentStatus === 'offline_paid' ? 'Offline Paid' : 'Paid')
+                : '',
               verificationStatus: idx === 0 ? (lead.isVerified ? 'Verified' : 'Pending') : '',
             });
           });
 
+          // Merge for cleaner look
           if (members.length > 1) {
             worksheet.mergeCells(`A${startRow}:A${startRow + members.length - 1}`);
             worksheet.mergeCells(`E${startRow}:E${startRow + members.length - 1}`);
             worksheet.mergeCells(`G${startRow}:G${startRow + members.length - 1}`);
             worksheet.mergeCells(`H${startRow}:H${startRow + members.length - 1}`);
           }
+
           srno++;
         });
       } else {
+        // Individual events
         participants.forEach((p, idx) => {
           worksheet.addRow({
             srno: idx + 1,
@@ -522,13 +584,13 @@ export class ExcelService {
             phone: p.phone,
             teamName: '',
             registrationType: p.registrationType || 'regular',
-            paymentStatus: this.formatPaymentStatus(p.paymentStatus),
+            paymentStatus: p.paymentStatus === 'offline_paid' ? 'Offline Paid' : 'Paid',
             verificationStatus: p.isVerified ? 'Verified' : 'Pending',
           });
         });
       }
 
-      // Style
+      // === Style Rows ===
       worksheet.eachRow((row, rowNumber) => {
         row.eachCell((cell) => {
           cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
@@ -551,15 +613,14 @@ export class ExcelService {
       });
 
       worksheet.views = [{ state: 'frozen', ySplit: 1 }];
-      worksheet.pageSetup = { orientation: 'landscape', paperSize: 9 };
     }
 
-    // === 3️⃣ SAVE FILE ===
+    // === 5️⃣ SAVE FILE ===
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
-    const fileName = `Event_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `Event_Report_PaidOnly_${new Date().toISOString().split('T')[0]}.xlsx`;
     saveAs(blob, fileName);
   }
 

@@ -290,6 +290,8 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
                           )}
                         </div>
                       )}
+
+                      {/* Copy Button */}
                       <button
                         onClick={() => copyToClipboard(code.code)}
                         className="p-1 hover:bg-gray-600 rounded transition-colors"
@@ -297,6 +299,22 @@ const OfflineCodeGenerator: React.FC<OfflineCodeGeneratorProps> = ({
                       >
                         <Copy className="h-4 w-4 text-gray-400" />
                       </button>
+
+                      {/* 🗑️ Delete Button (only show if not used) */}
+                      {!code.isUsed && (
+                        <button
+                          onClick={async () => {
+                            if (window.confirm('Delete this offline payment code?')) {
+                              await offlineCodeService.deleteCode(code.id!);
+                              toast.success('Code deleted successfully!');
+                            }
+                          }}
+                          className="p-1 hover:bg-red-600 rounded transition-colors"
+                          title="Delete code"
+                        >
+                          <X className="h-4 w-4 text-red-400" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))

@@ -65,6 +65,7 @@ const AdminPage: React.FC = () => {
   const [showOfflineRegistration, setShowOfflineRegistration] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [showRegistrationControls, setShowRegistrationControls] = useState(false);
+  const [globalUpiId, setGlobalUpiId] = useState('');
 
   useEffect(() => {
     // Check if admin is already logged in
@@ -448,6 +449,34 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  const handleUpdateAllUpiIds = async () => {
+    if (!globalUpiId.trim()) {
+      toast.error('Please enter a valid UPI ID');
+      return;
+    }
+
+    if (!window.confirm(`Update UPI ID to "${globalUpiId}" for ${events.length} events?`)) {
+      return;
+    }
+
+    try {
+      const updatePromises = events.map(event =>
+        dataService.updateEvent(event.id, {
+          ...event,
+          upiId: globalUpiId,
+          updatedAt: new Date().toISOString()
+        })
+      );
+
+      await Promise.all(updatePromises);
+      toast.success('UPI ID updated successfully for all events!');
+      setGlobalUpiId('');
+    } catch (error) {
+      console.error('Error updating UPI IDs:', error);
+      toast.error('Failed to update UPI IDs');
+    }
+  };
+
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -543,6 +572,28 @@ const AdminPage: React.FC = () => {
     );
   }
 
+  const getPaidCountForEvent = (eventId: string): number => {
+    return participants.reduce((count, p) => {
+      if (p.eventId !== eventId) return count;
+
+      if (p.paymentStatus === 'paid' || p.paymentStatus === 'offline_paid') {
+        if (p.teamId) {
+          const teamLead = participants.find(
+            (x) => x.teamId === p.teamId && x.isTeamLead
+          );
+          if (teamLead && (teamLead.paymentStatus === 'paid' || teamLead.paymentStatus === 'offline_paid')) {
+            return teamLead.id === p.id
+              ? count + participants.filter(x => x.teamId === teamLead.teamId).length
+              : count;
+          }
+        } else {
+          return count + 1;
+        }
+      }
+      return count;
+    }, 0);
+  };
+
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
@@ -614,7 +665,32 @@ const AdminPage: React.FC = () => {
               <div>
                 <p className="text-green-100">Total Participants</p>
                 <p className="text-3xl font-bold">
-                  {events.reduce((sum, event) => sum + event.currentParticipants, 0)}
+                  {
+                    participants.reduce((total, participant) => {
+                      // Only count if paid or offline_paid
+                      if (participant.paymentStatus === 'paid' || participant.paymentStatus === 'offline_paid') {
+                        // If part of a team, only count if the team lead has paid
+                        if (participant.teamId) {
+                          // Find the team lead
+                          const teamLead = participants.find(
+                            (p) => p.teamId === participant.teamId && p.isTeamLead
+                          );
+
+                          if (teamLead && (teamLead.paymentStatus === 'paid' || teamLead.paymentStatus === 'offline_paid')) {
+                            // Count all team members once (by teamId)
+                            // To avoid double-counting, only count when iterating over team lead
+                            return teamLead.id === participant.id
+                              ? total + participants.filter(p => p.teamId === teamLead.teamId).length
+                              : total;
+                          }
+                        } else {
+                          // Individual participant (not in a team)
+                          return total + 1;
+                        }
+                      }
+                      return total;
+                    }, 0)
+                  }
                 </p>
               </div>
               <Users className="h-8 w-8 text-green-200" />
@@ -1144,7 +1220,7 @@ const AdminPage: React.FC = () => {
                     <h3 className="text-lg font-semibold text-white">{event.title}</h3>
                     <div className="flex items-center space-x-2">
                       <span className="text-sm text-gray-400">
-                        {event.currentParticipants} participants
+                        {getPaidCountForEvent(event.id)} participants
                       </span>
                     </div>
                   </div>
@@ -1235,6 +1311,32 @@ const AdminPage: React.FC = () => {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Global UPI Update Section */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-semibold text-white mb-6">Global UPI ID Update</h2>
+          <div className="bg-gray-800 rounded-xl p-6 mb-8">
+            <p className="text-gray-300 mb-4">
+              Update the <span className="text-cyan-400 font-semibold">UPI ID</span> for all events at once. This is useful if your payment UPI has changed.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <input
+                type="text"
+                value={globalUpiId}
+                onChange={(e) => setGlobalUpiId(e.target.value)}
+                placeholder="e.g. example@upi"
+                className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+              />
+              <button
+                onClick={handleUpdateAllUpiIds}
+                className="btn-primary w-full sm:w-auto flex items-center justify-center"
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Update All UPI IDs
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Event Dates Management */}
